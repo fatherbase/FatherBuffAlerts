@@ -1,12 +1,12 @@
 -- FatherBuffAlerts (WoW 1.12 / Lua 5.0)
--- Version: 2.1.1
+-- Version: 2.1.2
 
 FBA = {
-  version = "2.1.1",
+  version = "2.1.2",
   timer   = 0,          -- ~10 Hz scan throttle
   EPSILON = 0.15,
   rt      = {},         -- runtime flags per buff key
-  activeKey = nil,
+  activeKey = nil
 }
 
 -- ------------ utils
@@ -46,7 +46,7 @@ local function DefaultSpell(name)
     threshold = 4,
     sound = "default",
     combatOnly = false,
-    useLongReminder = true, -- 5m reminder if the instance lasts >= 9m
+    useLongReminder = true  -- 5m reminder if the instance lasts >= 9m
   }
 end
 
@@ -64,7 +64,7 @@ local defaults = {
   spells = {},
   minimap = { show = true, angle = 220 },
   firstRunDone = false,
-  _migrated = false,
+  _migrated = false
 }
 
 function FBA:InitDB()
@@ -261,11 +261,11 @@ local function AddSpellByName(name)
 end
 
 local function RemoveSpellByName(name)
-  local sp, key = GetSpellCfgByName(name)
-  if sp then
+  local cfg, key = GetSpellCfgByName(name)
+  if cfg then
     FBA.db.spells[key] = nil
     FBA.rt[key] = nil
-    Print("Removed '"..sp.name.."'.")
+    Print("Removed '"..cfg.name.."'.")
     if FBA.UI_Refresh then FBA:UI_Refresh() end
   else
     Print("Not tracking '"..(name or "").."'.")
@@ -352,13 +352,14 @@ SlashCmdList["FBA"] = function(msg)
     local lraw = string.lower(raw)
 
     -- delay
-    local dnm, dval = string.find(lraw, "%sdelay%s")
-    if dnm then
+    local dstart, dend = string.find(lraw, "%sdelay%s")
+    if dstart then
       local _,_, nm, s = string.find(raw, "^(.-)%s+[dD][eE][lL][aA][yY]%s+([%d%.]+)%s*$")
       if not nm or not s then Print("Usage: /fba set <Buff> delay <seconds>"); return end
-      local sp = GetSpellCfgByName(nm)
-      if not sp or not sp[1] then Print("Unknown buff '"..nm.."'"); return end
-      local cfg = sp[1]
+      local cfg = GetSpellCfgByName(nm)
+      local key
+      cfg, key = GetSpellCfgByName(nm)
+      if not cfg then Print("Unknown buff '"..nm.."'"); return end
       local n = tonumber(s)
       if not n then Print("Delay must be a number"); return end
       if n < 0 then n = 0 end
@@ -370,13 +371,14 @@ SlashCmdList["FBA"] = function(msg)
     end
 
     -- sound
-    local snm = string.find(lraw, "%ssound%s")
-    if snm then
+    local sstart = string.find(lraw, "%ssound%s")
+    if sstart then
       local _,_, nm, rest = string.find(raw, "^(.-)%s+[sS][oO][uU][nN][dD]%s+(.+)$")
       if not nm or not rest then Print("Usage: /fba set <Buff> sound default|none|<path>"); return end
-      local sp = GetSpellCfgByName(nm)
-      if not sp or not sp[1] then Print("Unknown buff '"..nm.."'"); return end
-      local cfg = sp[1]
+      local cfg = GetSpellCfgByName(nm)
+      local key
+      cfg, key = GetSpellCfgByName(nm)
+      if not cfg then Print("Unknown buff '"..nm.."'"); return end
       local m = string.lower(rest)
       if m == "default" or rest == "" then
         cfg.sound = "default"; Print("Sound for '"..cfg.name.."' set to default.")
@@ -390,12 +392,13 @@ SlashCmdList["FBA"] = function(msg)
     end
 
     -- combat toggle
-    local pos = string.find(lraw, "%scombat%s*$")
-    if pos then
-      local nm = string.sub(raw, 1, pos-1)
-      local sp = GetSpellCfgByName(nm)
-      if not sp or not sp[1] then Print("Unknown buff '"..(nm or "").."'"); return end
-      local cfg = sp[1]
+    local cpos = string.find(lraw, "%scombat%s*$")
+    if cpos then
+      local nm = string.sub(raw, 1, cpos-1)
+      local cfg = GetSpellCfgByName(nm)
+      local key
+      cfg, key = GetSpellCfgByName(nm)
+      if not cfg then Print("Unknown buff '"..(nm or "").."'"); return end
       cfg.combatOnly = not cfg.combatOnly
       Print("Combat-only for '"..cfg.name.."': "..(cfg.combatOnly and "ON" or "OFF"))
       if FBA.UI_Refresh then FBA:UI_Refresh() end
@@ -403,12 +406,13 @@ SlashCmdList["FBA"] = function(msg)
     end
 
     -- enable toggle
-    pos = string.find(lraw, "%senable%s*$")
-    if pos then
-      local nm = string.sub(raw, 1, pos-1)
-      local sp = GetSpellCfgByName(nm)
-      if not sp or not sp[1] then Print("Unknown buff '"..(nm or "").."'"); return end
-      local cfg = sp[1]
+    local epos = string.find(lraw, "%senable%s*$")
+    if epos then
+      local nm = string.sub(raw, 1, epos-1)
+      local cfg = GetSpellCfgByName(nm)
+      local key
+      cfg, key = GetSpellCfgByName(nm)
+      if not cfg then Print("Unknown buff '"..(nm or "").."'"); return end
       cfg.enabled = not cfg.enabled
       Print("Enabled for '"..cfg.name.."': "..(cfg.enabled and "ON" or "OFF"))
       if FBA.UI_Refresh then FBA:UI_Refresh() end
@@ -416,12 +420,13 @@ SlashCmdList["FBA"] = function(msg)
     end
 
     -- long toggle
-    pos = string.find(lraw, "%slong%s*$")
-    if pos then
-      local nm = string.sub(raw, 1, pos-1)
-      local sp = GetSpellCfgByName(nm)
-      if not sp or not sp[1] then Print("Unknown buff '"..(nm or "").."'"); return end
-      local cfg = sp[1]
+    local lpos = string.find(lraw, "%slong%s*$")
+    if lpos then
+      local nm = string.sub(raw, 1, lpos-1)
+      local cfg = GetSpellCfgByName(nm)
+      local key
+      cfg, key = GetSpellCfgByName(nm)
+      if not cfg then Print("Unknown buff '"..(nm or "").."'"); return end
       cfg.useLongReminder = not cfg.useLongReminder
       Print("Long-buff reminder for '"..cfg.name.."': "..(cfg.useLongReminder and "ON" or "OFF"))
       if FBA.UI_Refresh then FBA:UI_Refresh() end
@@ -465,9 +470,10 @@ SlashCmdList["FBA"] = function(msg)
   local testArg = ParseAfter(lower, "test")
   if testArg ~= nil then
     local raw = ParseAfter(msg, "test")
-    local sp = GetSpellCfgByName(raw)
-    if not sp or not sp[1] then Print("Usage: /fba test <Buff Name>"); return end
-    local cfg = sp[1]
+    local cfg = GetSpellCfgByName(raw)
+    local key
+    cfg, key = GetSpellCfgByName(raw)
+    if not cfg then Print("Usage: /fba test <Buff Name>"); return end
     PlayAlertSound(cfg.sound)
     if FBA.db.showAlert then
       if FBA.db.alertCountdown then
