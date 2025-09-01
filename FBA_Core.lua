@@ -1,18 +1,15 @@
 -- FatherBuffAlerts (WoW 1.12 / Lua 5.0)
--- Version: 2.1.0
--- Core: per-character, multi-buff sound + on-screen alerts as buffs approach expiry.
--- Slash: /fba
+-- Version: 2.1.1
 
 FBA = {
-  version = "2.1.0",
-  timer   = 0,          -- throttle for scans (~10 Hz)
-  EPSILON = 0.15,       -- small cushion for frame timing
-  rt = {},              -- runtime flags per spell key: { played = false }
-  activeKey = nil,      -- which buff is currently driving the countdown splash
+  version = "2.1.1",
+  timer   = 0,          -- ~10 Hz scan throttle
+  EPSILON = 0.15,
+  rt      = {},         -- runtime flags per buff key
+  activeKey = nil,
 }
 
--- ===== Utilities =====
-
+-- ------------ utils
 local function Print(msg)
   DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r "..(msg or ""))
 end
@@ -27,7 +24,7 @@ local function KeyFor(name)
   return string.lower(name)
 end
 
--- Tooltip for 1.12 buff-name fallback
+-- Tooltip fallback for 1.12
 local tip = CreateFrame("GameTooltip", "FBA_Tooltip", UIParent, "GameTooltipTemplate")
 local function GetBuffNameCompat(buff)
   if GetPlayerBuffName then return GetPlayerBuffName(buff) end
@@ -39,18 +36,17 @@ local function GetBuffNameCompat(buff)
   return txt
 end
 
--- ===== Defaults / DB =====
-
+-- ------------ DB / defaults
 local DEFAULT_BELL = "Sound\\Doodad\\BellTollHorde.wav"
 
 local function DefaultSpell(name)
   return {
-    name = name,             -- display name (case preserved)
-    enabled = true,          -- per-spell enable
-    threshold = 4,           -- seconds before expiry (short buffs)
-    sound = "default",       -- "default" | "none" | <path>
-    combatOnly = false,      -- play only in combat
-    useLongReminder = true,  -- if buff lasts ≥ 9 min, alert 5 min before end (for that instance)
+    name = name,
+    enabled = true,
+    threshold = 4,
+    sound = "default",
+    combatOnly = false,
+    useLongReminder = true, -- 5m reminder if the instance lasts >= 9m
   }
 end
 
@@ -61,21 +57,20 @@ local function IsDruid()
 end
 
 local defaults = {
-  enabled = false,                 -- master (per character). Defaults ON for druids at first run.
-  showAlert = true,                -- splash ON/OFF (global)
-  alertCountdown = true,           -- live countdown text (global)
-  alertPos = { x = 0, y = 120 },   -- splash position (offset from center)
-  spells = {},                     -- map: lower-name -> per-spell config
-  minimap = { show = true, angle = 220 }, -- minimap button
-  firstRunDone = false,            -- show settings on first run
-  _migrated = false,               -- internal
+  enabled = false,
+  showAlert = true,
+  alertCountdown = true,
+  alertPos = { x = 0, y = 120 },
+  spells = {},
+  minimap = { show = true, angle = 220 },
+  firstRunDone = false,
+  _migrated = false,
 }
 
 function FBA:InitDB()
   if not FatherBuffAlertsDB then FatherBuffAlertsDB = {} end
   local db = FatherBuffAlertsDB
 
-  -- Fill defaults
   if db.enabled == nil then db.enabled = IsDruid() and true or false end
   if db.showAlert == nil then db.showAlert = defaults.showAlert end
   if db.alertCountdown == nil then db.alertCountdown = defaults.alertCountdown end
@@ -84,7 +79,7 @@ function FBA:InitDB()
   if not db.minimap then db.minimap = { show = true, angle = 220 } end
   if db.firstRunDone == nil then db.firstRunDone = false end
 
-  -- Simple migration: change raw default bell path to "default"
+  -- one-time migration
   if not db._migrated then
     for k, sp in pairs(db.spells) do
       if sp and sp.sound == DEFAULT_BELL then sp.sound = "default" end
@@ -95,8 +90,7 @@ function FBA:InitDB()
   self.db = db
 end
 
--- ===== Sound =====
-
+-- ------------ sound
 local function PlayAlertSound(mode)
   mode = mode or "default"
   if mode == "" then mode = "default" end
@@ -109,8 +103,7 @@ local function PlayAlertSound(mode)
   if not ok then PlaySoundFile(DEFAULT_BELL) end
 end
 
--- ===== Scan / Update =====
-
+-- ------------ scan/update
 local function CollectActiveBuffs()
   local out = {}
   local i = 0
@@ -128,7 +121,7 @@ end
 
 local function EffectiveThreshold(spellCfg, tl)
   if spellCfg.useLongReminder and tl and tl >= 540 then
-    return 300
+    return 300 -- 5m before
   end
   return spellCfg.threshold or 4
 end
@@ -144,7 +137,6 @@ function FBA:OnUpdate(elapsed)
   if not elapsed then elapsed = arg1 end
   if not elapsed or elapsed <= 0 then return end
 
-  -- Splash animation (fade or text updates) handled by Alerts module
   if self.AlertOnUpdate then self:AlertOnUpdate(elapsed) end
 
   self.timer = (self.timer or 0) + elapsed
@@ -153,17 +145,16 @@ function FBA:OnUpdate(elapsed)
 
   local active = CollectActiveBuffs()
   local soonestKey, soonestTL, soonestLabel = nil, nil, nil
-  local anyEnabled = false
 
   for key, sp in pairs(self.db.spells) do
     if sp.enabled then
-      anyEnabled = true
       local a = active[key]
       local rt = self.rt[key] or { played=false }
       self.rt[key] = rt
 
       if a and a.tl then
         local effThr = EffectiveThreshold(sp, a.tl)
+
         if a.tl > (effThr + self.EPSILON) then
           rt.played = false
         end
@@ -184,7 +175,7 @@ function FBA:OnUpdate(elapsed)
                 self:StartCountdown(sp.name, a.tl)
                 self.activeKey = key
               else
-                local secs = math.floor((effThr) + 0.5)
+                local secs = math.floor(effThr + 0.5)
                 self:ShowStatic(sp.name.." expiring in "..secs.." seconds")
                 self.activeKey = nil
               end
@@ -212,15 +203,14 @@ function FBA:OnUpdate(elapsed)
   end
 end
 
--- ===== Slash commands =====
-
+-- ------------ slash helpers
 local function ShowHelp()
   Print("FatherBuffAlerts v"..FBA.version.." — Commands:")
   Print("  /fba settings              - Open settings window.")
   Print("  /fba enable                - Master ON/OFF (per-character).")
-  Print("  /fba list                  - List tracked buffs and settings.")
+  Print("  /fba list                  - List tracked buffs.")
   Print("  /fba add <Buff Name>       - Track a new buff.")
-  Print("  /fba add #<n>              - Add from last /fBA suggest by index.")
+  Print("  /fba add #<n>              - Add from last /fba suggest by index.")
   Print("  /fba remove <Buff Name>    - Stop tracking a buff.")
   Print("  /fba suggest [filter]      - List spellbook names.")
   Print("  /fba set <Buff> delay <s>  - Set per-buff delay.")
@@ -228,12 +218,12 @@ local function ShowHelp()
   Print("  /fba set <Buff> combat     - Toggle per-buff combat-only.")
   Print("  /fba set <Buff> enable     - Toggle per-buff enable.")
   Print("  /fba set <Buff> long       - Toggle 5m reminder for ≥9m buffs.")
-  Print("  /fba alert                 - Toggle on-screen splash (global).")
-  Print("  /fba countdown             - Toggle live countdown text (global).")
-  Print("  /fba unlock | /fba lock    - Move/lock the splash.")
+  Print("  /fba alert                 - Toggle splash (global).")
+  Print("  /fba countdown             - Toggle live countdown (global).")
+  Print("  /fba unlock | /fba lock    - Move/lock splash position.")
   Print("  /fba test <Buff>           - Test that buff’s sound + splash.")
-  Print("  /fba status                - Show global & per-buff settings.")
-}
+  Print("  /fba status                - Show settings.")
+end
 
 FBA.lastSuggest = nil
 
@@ -297,6 +287,7 @@ local function ListTracked()
   if n == 0 then Print("  (none)") end
 end
 
+-- ------------ slash
 SLASH_FBA1 = "/fba"
 SlashCmdList["FBA"] = function(msg)
   msg = msg or ""
@@ -358,94 +349,99 @@ SlashCmdList["FBA"] = function(msg)
   if setArg ~= nil then
     local raw = ParseAfter(msg, "set")
     if not raw or raw == "" then Print("Usage: /fba set <Buff> ..."); return end
-
     local lraw = string.lower(raw)
-    local which
 
-    local p = string.find(lraw, "%sdelay%s")
-    if p then which = "delay" end
-    p = p or string.find(lraw, "%ssound%s")
-    if (not which) and p then which = "sound" end
-    p = p or string.find(lraw, "%scombat$")
-    if (not which) and p then which = "combat" end
-    p = p or string.find(lraw, "%senable$")
-    if (not which) and p then which = "enable" end
-    p = p or string.find(lraw, "%slong$")
-    if (not which) and p then which = "long" end
-
-    if not which then
-      Print("Usage: /fba set <Buff> delay <s> | sound <...> | combat | enable | long")
-      return
-    end
-
-    if which == "delay" then
-      local _,_, nm, s = string.find(raw, "^(.-)%s+[dD][eE][lL][aA][yY]%s+([%d%.]+)")
+    -- delay
+    local dnm, dval = string.find(lraw, "%sdelay%s")
+    if dnm then
+      local _,_, nm, s = string.find(raw, "^(.-)%s+[dD][eE][lL][aA][yY]%s+([%d%.]+)%s*$")
       if not nm or not s then Print("Usage: /fba set <Buff> delay <seconds>"); return end
-      local sp, key = GetSpellCfgByName(nm)
-      if not sp then Print("Unknown buff '"..nm.."'"); return end
+      local sp = GetSpellCfgByName(nm)
+      if not sp or not sp[1] then Print("Unknown buff '"..nm.."'"); return end
+      local cfg = sp[1]
       local n = tonumber(s)
       if not n then Print("Delay must be a number"); return end
       if n < 0 then n = 0 end
       if n > 600 then n = 600 end
-      sp.threshold = n
-      Print("Delay for '"..sp.name.."' set to "..n.."s.")
-      if FBA.UI_Refresh then FBA:UI_Refresh() end
-      return
-    elseif which == "sound" then
-      local _,_, nm, rest = string.find(raw, "^(.-)%s+[sS][oO][uU][nN][dD]%s+(.+)")
-      if not nm or not rest then Print("Usage: /fba set <Buff> sound default|none|<path>"); return end
-      local sp, key = GetSpellCfgByName(nm)
-      if not sp then Print("Unknown buff '"..nm.."'"); return end
-      local modeLower = string.lower(rest)
-      if modeLower == "default" or rest == "" then
-        sp.sound = "default"
-        Print("Sound for '"..sp.name.."' set to default bell.")
-      elseif modeLower == "none" then
-        sp.sound = "none"
-        Print("Sound for '"..sp.name.."' disabled.")
-      else
-        sp.sound = rest
-        Print("Sound for '"..sp.name.."' set to custom: "..rest)
-      end
-      if FBA.UI_Refresh then FBA:UI_Refresh() end
-      return
-    elseif which == "combat" then
-      local nm = string.sub(raw, 1, string.find(string.lower(raw), "%scombat$") - 1)
-      local sp, key = GetSpellCfgByName(nm)
-      if not sp then Print("Unknown buff '"..(nm or "").."'"); return end
-      sp.combatOnly = not sp.combatOnly
-      Print("Combat-only for '"..sp.name.."': "..(sp.combatOnly and "ON" or "OFF"))
-      if FBA.UI_Refresh then FBA:UI_Refresh() end
-      return
-    elseif which == "enable" then
-      local nm = string.sub(raw, 1, string.find(string.lower(raw), "%senable$") - 1)
-      local sp, key = GetSpellCfgByName(nm)
-      if not sp then Print("Unknown buff '"..(nm or "").."'"); return end
-      sp.enabled = not sp.enabled
-      Print("Enabled for '"..sp.name.."': "..(sp.enabled and "ON" or "OFF"))
-      if FBA.UI_Refresh then FBA:UI_Refresh() end
-      return
-    elseif which == "long" then
-      local nm = string.sub(raw, 1, string.find(string.lower(raw), "%slong$") - 1)
-      local sp, key = GetSpellCfgByName(nm)
-      if not sp then Print("Unknown buff '"..(nm or "").."'"); return end
-      sp.useLongReminder = not sp.useLongReminder
-      Print("Long-buff reminder for '"..sp.name.."': "..(sp.useLongReminder and "ON" or "OFF"))
+      cfg.threshold = n
+      Print("Delay for '"..cfg.name.."' set to "..n.."s.")
       if FBA.UI_Refresh then FBA:UI_Refresh() end
       return
     end
+
+    -- sound
+    local snm = string.find(lraw, "%ssound%s")
+    if snm then
+      local _,_, nm, rest = string.find(raw, "^(.-)%s+[sS][oO][uU][nN][dD]%s+(.+)$")
+      if not nm or not rest then Print("Usage: /fba set <Buff> sound default|none|<path>"); return end
+      local sp = GetSpellCfgByName(nm)
+      if not sp or not sp[1] then Print("Unknown buff '"..nm.."'"); return end
+      local cfg = sp[1]
+      local m = string.lower(rest)
+      if m == "default" or rest == "" then
+        cfg.sound = "default"; Print("Sound for '"..cfg.name.."' set to default.")
+      elseif m == "none" then
+        cfg.sound = "none"; Print("Sound for '"..cfg.name.."' disabled.")
+      else
+        cfg.sound = rest; Print("Sound for '"..cfg.name.."' set to: "..rest)
+      end
+      if FBA.UI_Refresh then FBA:UI_Refresh() end
+      return
+    end
+
+    -- combat toggle
+    local pos = string.find(lraw, "%scombat%s*$")
+    if pos then
+      local nm = string.sub(raw, 1, pos-1)
+      local sp = GetSpellCfgByName(nm)
+      if not sp or not sp[1] then Print("Unknown buff '"..(nm or "").."'"); return end
+      local cfg = sp[1]
+      cfg.combatOnly = not cfg.combatOnly
+      Print("Combat-only for '"..cfg.name.."': "..(cfg.combatOnly and "ON" or "OFF"))
+      if FBA.UI_Refresh then FBA:UI_Refresh() end
+      return
+    end
+
+    -- enable toggle
+    pos = string.find(lraw, "%senable%s*$")
+    if pos then
+      local nm = string.sub(raw, 1, pos-1)
+      local sp = GetSpellCfgByName(nm)
+      if not sp or not sp[1] then Print("Unknown buff '"..(nm or "").."'"); return end
+      local cfg = sp[1]
+      cfg.enabled = not cfg.enabled
+      Print("Enabled for '"..cfg.name.."': "..(cfg.enabled and "ON" or "OFF"))
+      if FBA.UI_Refresh then FBA:UI_Refresh() end
+      return
+    end
+
+    -- long toggle
+    pos = string.find(lraw, "%slong%s*$")
+    if pos then
+      local nm = string.sub(raw, 1, pos-1)
+      local sp = GetSpellCfgByName(nm)
+      if not sp or not sp[1] then Print("Unknown buff '"..(nm or "").."'"); return end
+      local cfg = sp[1]
+      cfg.useLongReminder = not cfg.useLongReminder
+      Print("Long-buff reminder for '"..cfg.name.."': "..(cfg.useLongReminder and "ON" or "OFF"))
+      if FBA.UI_Refresh then FBA:UI_Refresh() end
+      return
+    end
+
+    Print("Usage: /fba set <Buff> delay <s> | sound <...> | combat | enable | long")
+    return
   end
 
   if lower == "alert" then
     FBA.db.showAlert = not FBA.db.showAlert
-    Print("On-screen alert: "..(FBA.db.showAlert and "ON" or "OFF"))
+    Print("On-screen splash: "..(FBA.db.showAlert and "ON" or "OFF"))
     if FBA.UI_Refresh then FBA:UI_Refresh() end
     return
   end
 
   if lower == "countdown" then
     FBA.db.alertCountdown = not FBA.db.alertCountdown
-    Print("Live countdown text: "..(FBA.db.alertCountdown and "ON" or "OFF"))
+    Print("Live countdown: "..(FBA.db.alertCountdown and "ON" or "OFF"))
     if not FBA.db.alertCountdown then FBA:HideAlert() end
     if FBA.UI_Refresh then FBA:UI_Refresh() end
     return
@@ -469,15 +465,16 @@ SlashCmdList["FBA"] = function(msg)
   local testArg = ParseAfter(lower, "test")
   if testArg ~= nil then
     local raw = ParseAfter(msg, "test")
-    local sp, key = GetSpellCfgByName(raw)
-    if not sp then Print("Usage: /fba test <Buff Name>"); return end
-    PlayAlertSound(sp.sound)
+    local sp = GetSpellCfgByName(raw)
+    if not sp or not sp[1] then Print("Usage: /fba test <Buff Name>"); return end
+    local cfg = sp[1]
+    PlayAlertSound(cfg.sound)
     if FBA.db.showAlert then
       if FBA.db.alertCountdown then
-        FBA:StartCountdown(sp.name, sp.threshold or 4)
+        FBA:StartCountdown(cfg.name, cfg.threshold or 4)
       else
-        local secs = math.floor((sp.threshold or 4) + 0.5)
-        FBA:ShowStatic(sp.name.." expiring in "..secs.." seconds")
+        local secs = math.floor((cfg.threshold or 4) + 0.5)
+        FBA:ShowStatic(cfg.name.." expiring in "..secs.." seconds")
       end
     end
     return
@@ -488,7 +485,7 @@ SlashCmdList["FBA"] = function(msg)
     Print("FatherBuffAlerts v"..FBA.version.." — Global:")
     Print("  Enabled:         "..(FBA.db.enabled and "ON" or "OFF"))
     Print("  Splash:          "..(FBA.db.showAlert and "ON" or "OFF"))
-    Print("  Countdown text:  "..(FBA.db.alertCountdown and "ON" or "OFF"))
+    Print("  Countdown:       "..(FBA.db.alertCountdown and "ON" or "OFF"))
     Print(string.format("  Position:        x=%d, y=%d (from center)", pos.x or 0, pos.y or 0))
     ListTracked()
     return
@@ -497,8 +494,7 @@ SlashCmdList["FBA"] = function(msg)
   ShowHelp()
 end
 
--- ===== Frame / Events =====
-
+-- ------------ events
 local f = CreateFrame("Frame", "FBA_Frame")
 f:RegisterEvent("VARIABLES_LOADED")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -507,9 +503,8 @@ f:RegisterEvent("PLAYER_AURAS_CHANGED")
 f:SetScript("OnEvent", function()
   if event == "VARIABLES_LOADED" then
     FBA:InitDB()
-    FBA:InitAlerts()   -- in FBA_Alerts.lua
-    FBA:UI_Init()      -- in FBA_UI.lua (builds UI + minimap button)
-    -- first run: auto-open settings
+    FBA:InitAlerts()   -- Alerts file
+    FBA:UI_Init()      -- UI file
     if not FBA.db.firstRunDone then
       if FBA.UI_Show then FBA:UI_Show() end
       FBA.db.firstRunDone = true

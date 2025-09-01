@@ -7,6 +7,14 @@ Per-character **multi-buff** expiry alerts with a **sound** and an optional **ce
 
 ## Changelog
 
+### 2.1.1
+
+- **Fix:** Resolved a Lua syntax error in `FBA_Core.lua` (unexpected `}`) that prevented the addon from loading.
+- **Fix:** Minimap button now shows a proper icon and anchors safely to the minimap center on first load; respects saved angle/visibility after variables load.
+- **Fix:** Added nil-guards across the UI to prevent “attempt to index global 'FBA' (a nil value)” if the button is clicked before init completes.
+- **Stability:** Cleaned up `/fba set ...` parsing and return paths; tightened 1.12-safe logic and ensured all branches close correctly.
+- **Stability:** More defensive defaults (sound fallback, splash state) to avoid partial-init edge cases.
+
 ### 2.1.0
 
 - **Settings UI:** In-game window with two tabs:

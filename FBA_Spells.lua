@@ -1,5 +1,4 @@
 -- FatherBuffAlerts - Spellbook suggest & helpers
--- Requires FBA_Core.lua
 
 function FBA:GatherSpellbookNames()
   local out, seen = {}, {}
