@@ -1,15 +1,22 @@
 -- FatherBuffAlerts (WoW 1.12 / Lua 5.0)
--- Version: 2.1.2
+-- Core logic: per-character DB, multi-buff scanning, sounds, countdown splash hooks, slash commands.
+-- Version: 2.1.3
 
-FBA = {
-  version = "2.1.2",
-  timer   = 0,          -- ~10 Hz scan throttle
-  EPSILON = 0.15,
-  rt      = {},         -- runtime flags per buff key
-  activeKey = nil
-}
+-- Keep a single global table no matter load order
+FBA = FBA or {}
 
--- ------------ utils
+-- ---- Core state / constants
+FBA.version    = "2.1.3"
+FBA.timer      = FBA.timer or 0          -- ~10 Hz scan throttle
+FBA.EPSILON    = FBA.EPSILON or 0.15     -- small cushion for frame timing
+FBA.rt         = FBA.rt or {}            -- runtime flags per tracked buff key
+FBA.activeKey  = nil                     -- which buff drives the live countdown
+FBA.UI_waitNextCast = FBA.UI_waitNextCast or false  -- set by UI "Add Next Cast" button
+
+local DEFAULT_BELL = "Sound\\Doodad\\BellTollHorde.wav"
+
+-- ---- Utilities
+
 local function Print(msg)
   DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r "..(msg or ""))
 end
@@ -24,7 +31,7 @@ local function KeyFor(name)
   return string.lower(name)
 end
 
--- Tooltip fallback for 1.12
+-- Tooltip fallback for 1.12 to read buff names
 local tip = CreateFrame("GameTooltip", "FBA_Tooltip", UIParent, "GameTooltipTemplate")
 local function GetBuffNameCompat(buff)
   if GetPlayerBuffName then return GetPlayerBuffName(buff) end
@@ -36,17 +43,16 @@ local function GetBuffNameCompat(buff)
   return txt
 end
 
--- ------------ DB / defaults
-local DEFAULT_BELL = "Sound\\Doodad\\BellTollHorde.wav"
+-- ---- Defaults / DB
 
 local function DefaultSpell(name)
   return {
-    name = name,
-    enabled = true,
-    threshold = 4,
-    sound = "default",
-    combatOnly = false,
-    useLongReminder = true  -- 5m reminder if the instance lasts >= 9m
+    name = name,            -- display label (case preserved)
+    enabled = true,         -- per-buff toggle
+    threshold = 4,          -- seconds before expiry
+    sound = "default",      -- "default" | "none" | <path>
+    combatOnly = false,     -- only alert in combat
+    useLongReminder = true  -- if the instance lasts >= 9m, also remind at 5m left
   }
 end
 
@@ -57,11 +63,11 @@ local function IsDruid()
 end
 
 local defaults = {
-  enabled = false,
-  showAlert = true,
-  alertCountdown = true,
-  alertPos = { x = 0, y = 120 },
-  spells = {},
+  enabled = false,                 -- master (per character)
+  showAlert = true,                -- splash on/off (global)
+  alertCountdown = true,           -- live countdown text (global)
+  alertPos = { x = 0, y = 120 },   -- splash position relative to center
+  spells = {},                     -- map: lower-name -> per-spell config
   minimap = { show = true, angle = 220 },
   firstRunDone = false,
   _migrated = false
@@ -79,9 +85,9 @@ function FBA:InitDB()
   if not db.minimap then db.minimap = { show = true, angle = 220 } end
   if db.firstRunDone == nil then db.firstRunDone = false end
 
-  -- one-time migration
+  -- one-time migration: turn old raw bell paths into "default"
   if not db._migrated then
-    for k, sp in pairs(db.spells) do
+    for _, sp in pairs(db.spells) do
       if sp and sp.sound == DEFAULT_BELL then sp.sound = "default" end
     end
     db._migrated = true
@@ -90,7 +96,8 @@ function FBA:InitDB()
   self.db = db
 end
 
--- ------------ sound
+-- ---- Sound
+
 local function PlayAlertSound(mode)
   mode = mode or "default"
   if mode == "" then mode = "default" end
@@ -103,7 +110,8 @@ local function PlayAlertSound(mode)
   if not ok then PlaySoundFile(DEFAULT_BELL) end
 end
 
--- ------------ scan/update
+-- ---- Buff scan / timing
+
 local function CollectActiveBuffs()
   local out = {}
   local i = 0
@@ -121,7 +129,7 @@ end
 
 local function EffectiveThreshold(spellCfg, tl)
   if spellCfg.useLongReminder and tl and tl >= 540 then
-    return 300 -- 5m before
+    return 300  -- 5 minutes for long buffs (instance-based)
   end
   return spellCfg.threshold or 4
 end
@@ -137,6 +145,7 @@ function FBA:OnUpdate(elapsed)
   if not elapsed then elapsed = arg1 end
   if not elapsed or elapsed <= 0 then return end
 
+  -- drive splash fade (non-countdown) from Alerts module
   if self.AlertOnUpdate then self:AlertOnUpdate(elapsed) end
 
   self.timer = (self.timer or 0) + elapsed
@@ -149,16 +158,18 @@ function FBA:OnUpdate(elapsed)
   for key, sp in pairs(self.db.spells) do
     if sp.enabled then
       local a = active[key]
-      local rt = self.rt[key] or { played=false }
+      local rt = self.rt[key] or { played = false }
       self.rt[key] = rt
 
       if a and a.tl then
         local effThr = EffectiveThreshold(sp, a.tl)
 
+        -- reset once we're clearly above threshold again
         if a.tl > (effThr + self.EPSILON) then
           rt.played = false
         end
 
+        -- pick the closest-to-expiring for driving the live countdown
         if a.tl <= (effThr + self.EPSILON) then
           if (not soonestTL) or a.tl < soonestTL then
             soonestTL = a.tl
@@ -167,16 +178,19 @@ function FBA:OnUpdate(elapsed)
           end
         end
 
+        -- fire once per crossing under threshold
         if (a.tl <= (effThr + self.EPSILON)) and not rt.played then
           if (not sp.combatOnly) or InCombat() then
             PlayAlertSound(sp.sound)
             if self.db.showAlert then
-              if self.db.alertCountdown then
+              if self.db.alertCountdown and self.StartCountdown then
                 self:StartCountdown(sp.name, a.tl)
                 self.activeKey = key
               else
                 local secs = math.floor(effThr + 0.5)
-                self:ShowStatic(sp.name.." expiring in "..secs.." seconds")
+                if self.ShowStatic then
+                  self:ShowStatic(sp.name.." expiring in "..secs.." seconds")
+                end
                 self.activeKey = nil
               end
             end
@@ -184,26 +198,29 @@ function FBA:OnUpdate(elapsed)
           rt.played = true
         end
       else
+        -- buff not present
         rt.played = false
       end
     end
   end
 
+  -- keep updating the live countdown text for the soonest buff
   if self.db.showAlert and self.db.alertCountdown and soonestKey and active[soonestKey] then
     local tl = active[soonestKey].tl or 0
-    self:UpdateCountdown(soonestLabel, tl)
+    if self.UpdateCountdown then self:UpdateCountdown(soonestLabel, tl) end
     self.activeKey = soonestKey
     if tl <= 0.05 then
-      self:HideAlert()
+      if self.HideAlert then self:HideAlert() end
       self.activeKey = nil
     end
   elseif self.db.alertCountdown and self.activeKey and (not active[self.activeKey]) then
-    self:HideAlert()
+    if self.HideAlert then self:HideAlert() end
     self.activeKey = nil
   end
 end
 
--- ------------ slash helpers
+-- ---- Slash helpers
+
 local function ShowHelp()
   Print("FatherBuffAlerts v"..FBA.version.." — Commands:")
   Print("  /fba settings              - Open settings window.")
@@ -225,7 +242,7 @@ local function ShowHelp()
   Print("  /fba status                - Show settings.")
 end
 
-FBA.lastSuggest = nil
+FBA.lastSuggest = FBA.lastSuggest or nil
 
 local function ParseAfter(msg, prefix)
   if not msg then return nil end
@@ -275,7 +292,7 @@ end
 local function ListTracked()
   local n = 0
   Print("Tracked buffs:")
-  for key, sp in pairs(FBA.db.spells) do
+  for _, sp in pairs(FBA.db.spells) do
     n = n + 1
     Print(string.format("  %d) %s  [enabled:%s, delay:%ss, combat:%s, sound:%s, long:%s]",
       n, sp.name, sp.enabled and "ON" or "OFF",
@@ -287,7 +304,8 @@ local function ListTracked()
   if n == 0 then Print("  (none)") end
 end
 
--- ------------ slash
+-- ---- Slash
+
 SLASH_FBA1 = "/fba"
 SlashCmdList["FBA"] = function(msg)
   msg = msg or ""
@@ -352,7 +370,7 @@ SlashCmdList["FBA"] = function(msg)
     local lraw = string.lower(raw)
 
     -- delay
-    local dstart, dend = string.find(lraw, "%sdelay%s")
+    local dstart, _ = string.find(lraw, "%sdelay%s")
     if dstart then
       local _,_, nm, s = string.find(raw, "^(.-)%s+[dD][eE][lL][aA][yY]%s+([%d%.]+)%s*$")
       if not nm or not s then Print("Usage: /fba set <Buff> delay <seconds>"); return end
@@ -447,22 +465,22 @@ SlashCmdList["FBA"] = function(msg)
   if lower == "countdown" then
     FBA.db.alertCountdown = not FBA.db.alertCountdown
     Print("Live countdown: "..(FBA.db.alertCountdown and "ON" or "OFF"))
-    if not FBA.db.alertCountdown then FBA:HideAlert() end
+    if not FBA.db.alertCountdown and FBA.HideAlert then FBA:HideAlert() end
     if FBA.UI_Refresh then FBA:UI_Refresh() end
     return
   end
 
   if lower == "unlock" then
-    FBA:ApplyAlertPosition()
-    FBA:ShowStatic("FatherBuffAlerts — drag me, then /fba lock")
-    FBA:ShowAnchor(true)
+    if FBA.ApplyAlertPosition then FBA:ApplyAlertPosition() end
+    if FBA.ShowStatic then FBA:ShowStatic("FatherBuffAlerts — drag me, then /fba lock") end
+    if FBA.ShowAnchor then FBA:ShowAnchor(true) end
     Print("Anchor shown. Drag it, then /fba lock.")
     return
   end
 
   if lower == "lock" then
-    FBA:ShowAnchor(false)
-    FBA:HideAlert()
+    if FBA.ShowAnchor then FBA:ShowAnchor(false) end
+    if FBA.HideAlert then FBA:HideAlert() end
     Print("Anchor locked.")
     return
   end
@@ -476,9 +494,9 @@ SlashCmdList["FBA"] = function(msg)
     if not cfg then Print("Usage: /fba test <Buff Name>"); return end
     PlayAlertSound(cfg.sound)
     if FBA.db.showAlert then
-      if FBA.db.alertCountdown then
+      if FBA.db.alertCountdown and FBA.StartCountdown then
         FBA:StartCountdown(cfg.name, cfg.threshold or 4)
-      else
+      elseif FBA.ShowStatic then
         local secs = math.floor((cfg.threshold or 4) + 0.5)
         FBA:ShowStatic(cfg.name.." expiring in "..secs.." seconds")
       end
@@ -500,23 +518,34 @@ SlashCmdList["FBA"] = function(msg)
   ShowHelp()
 end
 
--- ------------ events
+-- ---- Events / frame
+
 local f = CreateFrame("Frame", "FBA_Frame")
 f:RegisterEvent("VARIABLES_LOADED")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:RegisterEvent("PLAYER_AURAS_CHANGED")
+f:RegisterEvent("SPELLCAST_START")   -- Vanilla: arg1 = spell name
 
 f:SetScript("OnEvent", function()
   if event == "VARIABLES_LOADED" then
     FBA:InitDB()
-    FBA:InitAlerts()   -- Alerts file
-    FBA:UI_Init()      -- UI file
+    if FBA.InitAlerts then FBA:InitAlerts() end   -- FBA_Alerts.lua
+    if FBA.UI_Init then FBA:UI_Init() end         -- FBA_UI.lua
     if not FBA.db.firstRunDone then
       if FBA.UI_Show then FBA:UI_Show() end
       FBA.db.firstRunDone = true
     end
+
   elseif event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_AURAS_CHANGED" then
     for key, rt in pairs(FBA.rt) do rt.played = false end
+
+  elseif event == "SPELLCAST_START" then
+    local spellName = arg1
+    if FBA.UI_waitNextCast and spellName and spellName ~= "" then
+      FBA.UI_waitNextCast = false
+      AddSpellByName(spellName)
+      if FBA.UI_OnAddedFromCast then FBA:UI_OnAddedFromCast(spellName) end
+    end
   end
 end)
 

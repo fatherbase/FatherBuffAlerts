@@ -1,6 +1,6 @@
--- FatherBuffAlerts - Spellbook suggest & helpers
+-- FatherBuffAlerts - Spellbook helpers (WoW 1.12)
 
-function FBA:GatherSpellbookNames()
+function FBA:GatherSpellbookEntries()
   local out, seen = {}, {}
   if not (GetNumSpellTabs and GetSpellTabInfo and GetSpellName) then return out end
   for t = 1, GetNumSpellTabs() do
@@ -11,22 +11,31 @@ function FBA:GatherSpellbookNames()
         local nm = GetSpellName(idx, "spell")
         if nm and nm ~= "" and not seen[nm] then
           seen[nm] = true
-          table.insert(out, nm)
+          local tx = GetSpellTexture and GetSpellTexture(idx, "spell") or "Interface\\Icons\\INV_Misc_QuestionMark"
+          table.insert(out, { name = nm, texture = tx })
         end
       end
     end
   end
-  table.sort(out, function(a,b) return string.lower(a) < string.lower(b) end)
+  table.sort(out, function(a,b) return string.lower(a.name) < string.lower(b.name) end)
   return out
 end
 
+-- Back-compat (name-only)
+function FBA:GatherSpellbookNames()
+  local es = self:GatherSpellbookEntries()
+  local names = {}
+  for i=1,table.getn(es) do names[i] = es[i].name end
+  return names
+end
+
 function FBA:SuggestSpellbook(filterLower)
-  local names = self:GatherSpellbookNames()
+  local es = self:GatherSpellbookEntries()
   self.lastSuggest = {}
   local shown = 0
   DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Spellbook names:")
-  for i=1,table.getn(names) do
-    local nm = names[i]
+  for i=1,table.getn(es) do
+    local nm = es[i].name
     if (not filterLower) or string.find(string.lower(nm), filterLower, 1, true) then
       shown = shown + 1
       self.lastSuggest[shown] = nm
