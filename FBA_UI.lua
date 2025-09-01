@@ -16,7 +16,6 @@ btn:EnableMouse(true)
 btn:SetMovable(true)
 btn:SetClampedToScreen(true)
 
--- Ensure it's visible even before DB/positioning is ready
 btn:ClearAllPoints()
 btn:SetPoint("CENTER", Minimap, "CENTER", 0, 0)
 
@@ -39,8 +38,7 @@ btn:SetScript("OnDragStop", function(self)
   local mx, my = Minimap:GetCenter()
   local cx, cy = self:GetCenter()
   local dx, dy = cx - mx, cy - my
-  local angle = math.deg(math.atan2(dy, dx))
-  if angle < 0 then angle = angle + 360 end
+  local angle = math.deg(math.atan2(dy, dx)); if angle < 0 then angle = angle + 360 end
   FBA.db.minimap.angle = math.floor(angle + 0.5)
   if FBA.UI_PositionMinimapButton then FBA:UI_PositionMinimapButton() end
 end)
@@ -63,7 +61,7 @@ end
 -- =======================
 local frame = CreateFrame("Frame", "FBA_Config", UIParent)
 frame:SetWidth(720); frame:SetHeight(480)
-frame:SetPoint("CENTER")
+frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 frame:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
                     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
                     tile = true, tileSize = 32, edgeSize = 32,
@@ -76,25 +74,25 @@ frame:SetScript("OnDragStart", function(self) self:StartMoving() end)
 frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
 
 local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-title:SetPoint("TOP", 0, -16)
+title:SetPoint("TOP", frame, "TOP", 0, -16)
 title:SetText("FatherBuffAlerts — Settings")
 
 local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-close:SetPoint("TOPRIGHT", -5, -5)
+close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -5, -5)
 
 -- Global toggles
 local cbEnabled = CreateFrame("CheckButton", "FBA_CBEnabled", frame, "UICheckButtonTemplate")
-cbEnabled:SetPoint("TOPLEFT", 20, -48)
+cbEnabled:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -48)
 FBA_CBEnabledText:SetText("Enabled (per-character)")
 cbEnabled:SetScript("OnClick", function(self) if FBA and FBA.db then FBA.db.enabled = self:GetChecked() end end)
 
 local cbSplash = CreateFrame("CheckButton", "FBA_CBSplash", frame, "UICheckButtonTemplate")
-cbSplash:SetPoint("TOPLEFT", 20, -72)
+cbSplash:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -72)
 FBA_CBSplashText:SetText("Show on-screen splash")
 cbSplash:SetScript("OnClick", function(self) if FBA and FBA.db then FBA.db.showAlert = self:GetChecked() end end)
 
 local cbCountdown = CreateFrame("CheckButton", "FBA_CBCountdown", frame, "UICheckButtonTemplate")
-cbCountdown:SetPoint("TOPLEFT", 20, -96)
+cbCountdown:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -96)
 FBA_CBCountdownText:SetText("Show live countdown text")
 cbCountdown:SetScript("OnClick", function(self)
   if FBA and FBA.db then
@@ -104,7 +102,7 @@ cbCountdown:SetScript("OnClick", function(self)
 end)
 
 local cbMinimap = CreateFrame("CheckButton", "FBA_CBMinimap", frame, "UICheckButtonTemplate")
-cbMinimap:SetPoint("TOPLEFT", 20, -120)
+cbMinimap:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -120)
 FBA_CBMinimapText:SetText("Show minimap button")
 cbMinimap:SetScript("OnClick", function(self)
   if FBA and FBA.db then
@@ -116,7 +114,7 @@ end)
 -- Tabs
 local tabTracked = CreateFrame("Button", "FBA_TabTracked", frame, "UIPanelButtonTemplate")
 tabTracked:SetWidth(100); tabTracked:SetHeight(22)
-tabTracked:SetPoint("TOPLEFT", 20, -150)
+tabTracked:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -150)
 tabTracked:SetText("Tracked")
 
 local tabBook = CreateFrame("Button", "FBA_TabBook", frame, "UIPanelButtonTemplate")
@@ -127,7 +125,7 @@ tabBook:SetText("Spellbook")
 -- Left list (tracked OR spellbook)
 local listBG = CreateFrame("Frame", nil, frame)
 listBG:SetWidth(300); listBG:SetHeight(260)
-listBG:SetPoint("TOPLEFT", 20, -180)
+listBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -180)
 listBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                      edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
                      tile = true, tileSize = 16, edgeSize = 12,
@@ -135,14 +133,14 @@ listBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
 listBG:SetBackdropColor(0,0,0,0.5)
 
 local listTitle = listBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-listTitle:SetPoint("TOPLEFT", 8, -6)
+listTitle:SetPoint("TOPLEFT", listBG, "TOPLEFT", 8, -6)
 listTitle:SetText("Tracked Buffs")
 
 local rows, visibleRows = {}, 10
 for i=1,visibleRows do
   local b = CreateFrame("Button", nil, listBG, "UIPanelButtonTemplate")
   b:SetWidth(260); b:SetHeight(22)
-  b:SetPoint("TOPLEFT", 10, -20 - (i-1)*24)
+  b:SetPoint("TOPLEFT", listBG, "TOPLEFT", 10, -20 - (i-1)*24)
   b:SetText("")
   b:SetScript("OnClick", function(self)
     FBA.UI_selectedKey = self._key
@@ -153,7 +151,7 @@ end
 
 local btnPrev = CreateFrame("Button", nil, listBG, "UIPanelButtonTemplate")
 btnPrev:SetWidth(60); btnPrev:SetHeight(20)
-btnPrev:SetPoint("BOTTOMLEFT", 10, 8)
+btnPrev:SetPoint("BOTTOMLEFT", listBG, "BOTTOMLEFT", 10, 8)
 btnPrev:SetText("<")
 btnPrev:SetScript("OnClick", function()
   FBA.UI_page = (FBA.UI_page or 1) - 1
@@ -163,7 +161,7 @@ end)
 
 local btnNext = CreateFrame("Button", nil, listBG, "UIPanelButtonTemplate")
 btnNext:SetWidth(60); btnNext:SetHeight(20)
-btnNext:SetPoint("BOTTOMRIGHT", -10, 8)
+btnNext:SetPoint("BOTTOMRIGHT", listBG, "BOTTOMRIGHT", -10, 8)
 btnNext:SetText(">")
 btnNext:SetScript("OnClick", function()
   FBA.UI_page = (FBA.UI_page or 1) + 1
@@ -173,7 +171,7 @@ end)
 -- Add/custom box
 local addBox = CreateFrame("EditBox", "FBA_AddBox", frame, "InputBoxTemplate")
 addBox:SetWidth(260); addBox:SetHeight(20)
-addBox:SetPoint("TOPLEFT", 20, -450)
+addBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -450)
 addBox:SetAutoFocus(false)
 
 local addBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
@@ -197,7 +195,7 @@ end)
 -- Right detail panel
 local detBG = CreateFrame("Frame", nil, frame)
 detBG:SetWidth(340); detBG:SetHeight(260)
-detBG:SetPoint("TOPLEFT", 360, -180)
+detBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 360, -180)
 detBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
                     tile = true, tileSize = 16, edgeSize = 12,
@@ -205,11 +203,11 @@ detBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
 detBG:SetBackdropColor(0,0,0,0.5)
 
 local detTitle = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-detTitle:SetPoint("TOPLEFT", 8, -8)
+detTitle:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -8)
 detTitle:SetText("Buff Settings")
 
 local lblName = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lblName:SetPoint("TOPLEFT", 8, -36)
+lblName:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -36)
 lblName:SetText("Name: ")
 
 local txtName = detBG:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -217,7 +215,7 @@ txtName:SetPoint("LEFT", lblName, "RIGHT", 4, 0)
 txtName:SetText("—")
 
 local cbSpellEnabled = CreateFrame("CheckButton", "FBA_CBSpellEnabled", detBG, "UICheckButtonTemplate")
-cbSpellEnabled:SetPoint("TOPLEFT", 8, -60)
+cbSpellEnabled:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -60)
 FBA_CBSpellEnabledText:SetText("Enable this buff")
 cbSpellEnabled:SetScript("OnClick", function(self)
   local key = FBA.UI_selectedKey
@@ -228,7 +226,7 @@ cbSpellEnabled:SetScript("OnClick", function(self)
 end)
 
 local cbCombat = CreateFrame("CheckButton", "FBA_CBCombat", detBG, "UICheckButtonTemplate")
-cbCombat:SetPoint("TOPLEFT", 8, -84)
+cbCombat:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -84)
 FBA_CBCombatText:SetText("Only alert in combat")
 cbCombat:SetScript("OnClick", function(self)
   local key = FBA.UI_selectedKey
@@ -238,7 +236,7 @@ cbCombat:SetScript("OnClick", function(self)
 end)
 
 local cbLong = CreateFrame("CheckButton", "FBA_CBLong", detBG, "UICheckButtonTemplate")
-cbLong:SetPoint("TOPLEFT", 8, -108)
+cbLong:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -108)
 FBA_CBLongText:SetText("5m reminder for ≥9m buffs")
 cbLong:SetScript("OnClick", function(self)
   local key = FBA.UI_selectedKey
@@ -248,7 +246,7 @@ cbLong:SetScript("OnClick", function(self)
 end)
 
 local lblDelay = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lblDelay:SetPoint("TOPLEFT", 8, -136)
+lblDelay:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -136)
 lblDelay:SetText("Delay (seconds):")
 
 local ebDelay = CreateFrame("EditBox", "FBA_EBDelay", detBG, "InputBoxTemplate")
@@ -258,7 +256,7 @@ ebDelay:SetAutoFocus(false)
 ebDelay:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 
 local lblSound = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lblSound:SetPoint("TOPLEFT", 8, -166)
+lblSound:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -166)
 lblSound:SetText("Sound:")
 
 local ddSound = CreateFrame("Button", "FBA_DDSound", detBG, "UIPanelButtonTemplate")
@@ -287,7 +285,7 @@ end)
 
 local ebSound = CreateFrame("EditBox", "FBA_EBSoundPath", detBG, "InputBoxTemplate")
 ebSound:SetWidth(200); ebSound:SetHeight(20)
-ebSound:SetPoint("LEFT", FBA_DDSound, "RIGHT", 8, 0)
+ebSound:SetPoint("LEFT", ddSound, "RIGHT", 8, 0)
 ebSound:SetAutoFocus(false)
 ebSound:Hide()
 ebSound:SetScript("OnTextChanged", function(self)
@@ -300,7 +298,7 @@ end)
 
 local btnTest = CreateFrame("Button", nil, detBG, "UIPanelButtonTemplate")
 btnTest:SetWidth(80); btnTest:SetHeight(20)
-btnTest:SetPoint("TOPLEFT", 8, -196)
+btnTest:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -196)
 btnTest:SetText("Test")
 btnTest:SetScript("OnClick", function()
   local key = FBA.UI_selectedKey
@@ -343,7 +341,7 @@ local bookList, bookRows = {}, {}
 for i=1,visibleRows do
   local b = CreateFrame("Button", nil, listBG, "UIPanelButtonTemplate")
   b:SetWidth(260); b:SetHeight(22)
-  b:SetPoint("TOPLEFT", 10, -20 - (i-1)*24)
+  b:SetPoint("TOPLEFT", listBG, "TOPLEFT", 10, -20 - (i-1)*24)
   b:SetText("")
   b:SetScript("OnClick", function(self)
     FBA_AddBox:SetText(self._name or "")
@@ -354,7 +352,7 @@ end
 
 local bookFilter = CreateFrame("EditBox", "FBA_BookFilter", frame, "InputBoxTemplate")
 bookFilter:SetWidth(260); bookFilter:SetHeight(20)
-bookFilter:SetPoint("TOPLEFT", 20, -450)
+bookFilter:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -450)
 bookFilter:SetAutoFocus(false)
 bookFilter:Hide()
 bookFilter:SetScript("OnTextChanged", function(self)
@@ -489,7 +487,10 @@ function FBA:UI_Show()
   frame:Show()
   FBA:UI_SwitchTab(FBA.UI_tab or "tracked")
 end
-function FBA:UI_Hide() frame:Hide() end
+
+function FBA:UI_Hide()
+  frame:Hide()
+end
 
 function FBA:UI_Init()
   -- write-through delay
