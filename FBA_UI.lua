@@ -20,8 +20,11 @@ btn:SetPoint("CENTER", Minimap, "CENTER", 0, 0)
 
 -- Use Normal/Pushed/Highlight textures so it always shows in 1.12
 btn:SetNormalTexture(iconPath)
+local nt = btn:GetNormalTexture(); if nt then nt:SetAllPoints(btn); nt:SetTexCoord(0.07,0.93,0.07,0.93) end
 btn:SetPushedTexture(iconPath)
+local pt = btn:GetPushedTexture(); if pt then pt:SetAllPoints(btn); pt:SetTexCoord(0.07,0.93,0.07,0.93) end
 btn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
+local ht = btn:GetHighlightTexture(); if ht then ht:SetAllPoints(btn) end
 
 btn:SetScript("OnClick", function()
   if FBA and FBA.UI_Show then FBA:UI_Show() else
@@ -29,7 +32,7 @@ btn:SetScript("OnClick", function()
   end
 end)
 
--- Vanilla handlers use global `this`
+-- Vanilla uses global `this`
 btn:SetScript("OnDragStart", function() this:StartMoving() end)
 btn:SetScript("OnDragStop", function()
   this:StopMovingOrSizing()

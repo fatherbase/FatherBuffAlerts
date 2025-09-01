@@ -35,11 +35,17 @@ local anchorText = anchor:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 anchorText:SetPoint("CENTER", anchor, "CENTER", 0, 0)
 anchorText:SetText("FatherBuffAlerts — Drag me, then /fba lock")
 
+-- state
 FBA.alertActive = false
 FBA.alertModeCountdown = false
 FBA.alertTimer = 0
 FBA.alertHold = 1.2
 FBA.alertFade = 1.0
+
+-- countdown simulator (used by /fba test when countdown enabled)
+FBA.cdSimActive = false
+FBA.cdSimLabel  = nil
+FBA.cdSimTL     = 0
 
 function FBA:ApplyAlertPosition()
   local pos = self.db.alertPos or {x=0,y=0}
@@ -58,19 +64,42 @@ local function Format1(s) if not s or s < 0 then s = 0 end return string.format(
 function FBA:ShowStatic(msg)
   if not self.db.showAlert then return end
   text:SetText(msg or "")
-  FBA_AlertFrame:SetAlpha(1); FBA_AlertFrame:Show()
-  self.alertActive = true; self.alertModeCountdown = false; self.alertTimer = 0
+  FBA_AlertFrame:SetAlpha(1)
+  FBA_AlertFrame:Show()
+  self.alertActive = true
+  self.alertModeCountdown = false
+  self.alertTimer = 0
+  self.cdSimActive = false
 end
 
 function FBA:StartCountdown(label, tl)
   if not self.db.showAlert then return end
+  self.cdSimActive = false  -- external updates from Core
   local lbl = label or "Buff"
   text:SetText(lbl.." expiring in "..Format1(tl).."s")
-  FBA_AlertFrame:SetAlpha(1); FBA_AlertFrame:Show()
-  self.alertActive = true; self.alertModeCountdown = true
+  FBA_AlertFrame:SetAlpha(1)
+  FBA_AlertFrame:Show()
+  self.alertActive = true
+  self.alertModeCountdown = true
+end
+
+-- simulated countdown for /fba test
+function FBA:StartCountdownSim(label, seconds)
+  if not self.db.showAlert then return end
+  self.cdSimActive = true
+  self.cdSimLabel = label or "Buff"
+  self.cdSimTL = tonumber(seconds) or 4
+  if self.cdSimTL < 0 then self.cdSimTL = 0 end
+  text:SetText(self.cdSimLabel.." expiring in "..Format1(self.cdSimTL).."s")
+  FBA_AlertFrame:SetAlpha(1)
+  FBA_AlertFrame:Show()
+  self.alertActive = true
+  self.alertModeCountdown = true
 end
 
 function FBA:UpdateCountdown(label, tl)
+  -- real countdown driven by Core; disable simulator
+  self.cdSimActive = false
   if not self.alertModeCountdown then return end
   local lbl = label or "Buff"
   text:SetText(lbl.." expiring in "..Format1(tl).."s")
@@ -78,18 +107,37 @@ end
 
 function FBA:HideAlert()
   FBA_AlertFrame:Hide()
-  self.alertActive = false; self.alertModeCountdown = false; self.alertTimer = 0
+  self.alertActive = false
+  self.alertModeCountdown = false
+  self.alertTimer = 0
+  self.cdSimActive = false
 end
 
 function FBA:AlertOnUpdate(elapsed)
-  if self.alertActive and (not self.alertModeCountdown) then
+  if self.alertModeCountdown then
+    -- if sim active, tick down ourselves
+    if self.cdSimActive then
+      self.cdSimTL = self.cdSimTL - elapsed
+      if self.cdSimTL <= 0 then
+        self:HideAlert()
+      else
+        text:SetText((self.cdSimLabel or "Buff").." expiring in "..Format1(self.cdSimTL).."s")
+      end
+    end
+    return
+  end
+
+  -- fade static alerts
+  if self.alertActive then
     self.alertTimer = self.alertTimer + elapsed
     local a
-    if self.alertTimer <= self.alertHold then a = 1
+    if self.alertTimer <= self.alertHold then
+      a = 1
     elseif self.alertTimer <= (self.alertHold + self.alertFade) then
       a = 1 - ((self.alertTimer - self.alertHold) / self.alertFade)
     else
-      self:HideAlert(); a = 0
+      self:HideAlert()
+      a = 0
     end
     if a and FBA_AlertFrame:IsShown() then FBA_AlertFrame:SetAlpha(a) end
   end

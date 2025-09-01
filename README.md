@@ -7,6 +7,16 @@ Per-character **multi-buff** expiry alerts with a **sound** and an optional **ce
 
 ## Changelog
 
+### 2.1.4
+
+- **Test alerts:** `/fba test <Buff>` now mirrors real behavior.
+  - If **countdown** is ON → shows a **simulated countdown** (no buff needed).
+  - If **countdown** is OFF → shows a **static splash** that properly **fades out**.
+- **Long-buff reminder (≥9m):** 5-minute pre-warning now fires **once** with a **static splash only** (no countdown), independent of the near-expiry alert.
+- **Core timing:** Added per-buff runtime (`seenMaxTL`, `longPlayed`, `shortPlayed`) to prevent duplicate triggers and to detect long-duration instances reliably.
+- **Countdown scope:** Live countdown is used **only** for near-expiry alerts; long-buff reminder never starts a countdown.
+- **Minimap icon:** Fixed blank icon on Vanilla by using explicit Normal/Pushed/Highlight textures with proper texcoords and sizing.
+
 ### 2.1.2
 
 - **Fix:** Resolved a Lua syntax error in `FBA_Core.lua` (unexpected `}`) that prevented the addon from loading.
