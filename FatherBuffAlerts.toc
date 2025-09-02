@@ -1,7 +1,7 @@
 ## Interface: 11200
 ## Title: |cffffcc00F|rather|cffffcc00B|ruff|cffffcc00A|rlerts
 ## Notes: Per-character multi-buff expiry alerts with sound and on-screen splash. Configure with /fba.
-## Version: 2.1.8
+## Version: 2.1.9
 ## SavedVariablesPerCharacter: FatherBuffAlertsDB
 
 FBA_Core.lua

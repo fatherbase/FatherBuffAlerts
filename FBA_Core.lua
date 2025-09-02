@@ -1,11 +1,11 @@
 -- FatherBuffAlerts (WoW 1.12 / Lua 5.0)
 -- Core logic: DB, multi-buff scanning, sounds, countdown hooks, slash commands.
--- Version: 2.1.8
+-- Version: 2.1.9
 
 FBA = FBA or {}
 
 -- ---- Core state / constants
-FBA.version    = "2.1.8"
+FBA.version    = "2.1.9"
 FBA.timer      = FBA.timer or 0          -- ~10 Hz scan throttle
 FBA.EPSILON    = FBA.EPSILON or 0.15     -- small cushion for frame timing
 FBA.rt         = FBA.rt or {}            -- runtime flags per tracked buff key
@@ -40,7 +40,8 @@ local function DefaultSpell(name)
     sound = "default",      -- "default" | "none" | <path>
     combatOnly = false,
     useLongReminder = true, -- if instance lasts >= 9m, also remind at 5m
-    showCountdown = true,   -- per-buff live countdown (default ON)
+    showCountdown = true,   -- per-buff live countdown
+    showSplash = true,      -- per-buff on-screen splash
   }
 end
 
@@ -67,9 +68,10 @@ function FBA:InitDB()
     end
     db._migrated = true
   end
-  -- backfill new flag
+  -- backfill new flags
   for _, sp in pairs(db.spells) do
     if sp.showCountdown == nil then sp.showCountdown = true end
+    if sp.showSplash == nil then sp.showSplash = true end
   end
 
   self.db = db
@@ -141,9 +143,9 @@ function FBA:OnUpdate(elapsed)
           if (not rt.longPlayed) and (a.tl <= 300 + self.EPSILON) and (a.tl > (sp.threshold or 4) + self.EPSILON) then
             if (not sp.combatOnly) or InCombat() then
               PlayAlertSound(sp.sound)
-              if self.db.showAlert and self.ShowStatic then
-                -- 3s soft fade if big numbers
-                self:ShowStatic(" "..sp.name.." has ~5 minutes remaining", 3)
+              if self.db.showAlert and sp.showSplash and self.ShowStatic then
+                -- soft 3s fade for big numbers
+                self:ShowStatic(sp.name.." has ~5 minutes remaining", 3)
               end
             end
             rt.longPlayed = true
@@ -156,15 +158,14 @@ function FBA:OnUpdate(elapsed)
         local thr = sp.threshold or 4
         local prev = rt.prevTL
         if prev and (prev <= (thr + self.EPSILON)) then
-          -- already below threshold last tick; do nothing
+          -- already below threshold
         else
           if (a.tl <= (thr + self.EPSILON)) and not rt.shortPlayed then
             if (not sp.combatOnly) or InCombat() then
               PlayAlertSound(sp.sound)
-              if self.db.showAlert then
+              if self.db.showAlert and sp.showSplash then
                 local useCD = (self.db.alertCountdown and sp.showCountdown)
                 if useCD and self.StartCountdown then
-                  -- set tick step by threshold
                   self:SetCountdownStep(stepForThreshold(thr))
                   self:StartCountdown(sp.name, a.tl)
                   self.activeKey = key
@@ -183,7 +184,11 @@ function FBA:OnUpdate(elapsed)
         -- track the “soonest” one for live updates
         if (a.tl <= (thr + self.EPSILON)) then
           if (not soonestTL) or a.tl < soonestTL then
-            soonestTL = a.tl; soonestKey = key; soonestLabel = sp.name; soonestThr = thr; soonestShowCD = (self.db.alertCountdown and sp.showCountdown)
+            soonestTL = a.tl
+            soonestKey = key
+            soonestLabel = sp.name
+            soonestThr = thr
+            soonestShowCD = (self.db.alertCountdown and sp.showCountdown and sp.showSplash)
           end
         end
 
@@ -195,10 +200,9 @@ function FBA:OnUpdate(elapsed)
     end
   end
 
-  -- keep the live countdown text current for the nearest one (if per-buff countdown enabled)
+  -- keep the live countdown text current for the nearest one (if per-buff splash+countdown enabled)
   if self.db.showAlert and soonestShowCD and soonestKey and active[soonestKey] then
     local tl = active[soonestKey].tl or 0
-    -- set step appropriate to this active buff
     self:SetCountdownStep(stepForThreshold(soonestThr))
     if self.UpdateCountdown then self:UpdateCountdown(soonestLabel, tl) end
     self.activeKey = soonestKey
@@ -228,12 +232,13 @@ local function ShowHelp()
   Print("  /fba set <Buff> enable        - Toggle per-buff enable.")
   Print("  /fba set <Buff> long          - Toggle 5m reminder for ≥9m.")
   Print("  /fba set <Buff> countdown     - Toggle per-buff live countdown.")
+  Print("  /fba set <Buff> splash        - Toggle per-buff on-screen splash.")
   Print("  /fba alert                    - Toggle on-screen splash (global).")
   Print("  /fba countdown                - Toggle global live countdown.")
   Print("  /fba unlock | /fba lock       - Move/lock splash position.")
   Print("  /fba test <Buff>              - Test that buff’s alert.")
   Print("  /fba status                   - Show settings.")
-  Print("Note: Clicking a spell in the left Spellbook panel adds it to Tracked.")
+  Print("Note: Click a spell in the left Spellbook panel to add it to Tracked.")
 end
 
 FBA.lastSuggest = FBA.lastSuggest or nil
@@ -285,13 +290,14 @@ local function ListTracked()
   Print("Tracked buffs:")
   for _, sp in pairs(FBA.db.spells) do
     n = n + 1
-    Print(string.format("  %d) %s  [enabled:%s, delay:%ss, combat:%s, sound:%s, long:%s, countdown:%s]",
+    Print(string.format("  %d) %s  [enabled:%s, delay:%ss, combat:%s, sound:%s, long:%s, countdown:%s, splash:%s]",
       n, sp.name, sp.enabled and "ON" or "OFF",
       tostring(sp.threshold or 4),
       sp.combatOnly and "ON" or "OFF",
       (sp.sound == "default" and "default" or (sp.sound == "none" and "none" or sp.sound)),
       sp.useLongReminder and "ON" or "OFF",
-      sp.showCountdown and "ON" or "OFF"))
+      sp.showCountdown and "ON" or "OFF",
+      sp.showSplash and "ON" or "OFF"))
   end
   if n == 0 then Print("  (none)") end
 end
@@ -411,7 +417,18 @@ SlashCmdList["FBA"] = function(msg)
       return
     end
 
-    Print("Usage: /fba set <Buff> delay <s> | sound <...> | combat | enable | long | countdown")
+    -- per-buff splash toggle
+    local spos = string.find(lraw, "%ssplash%s*$")
+    if spos then
+      local nm = string.sub(raw, 1, spos-1)
+      local cfg = GetSpellCfgByName(nm); if not cfg then Print("Unknown buff '"..(nm or "").."'"); return end
+      cfg.showSplash = not cfg.showSplash
+      Print("On-screen splash for '"..cfg.name.."': "..(cfg.showSplash and "ON" or "OFF"))
+      if FBA.UI_Refresh then FBA:UI_Refresh() end
+      return
+    end
+
+    Print("Usage: /fba set <Buff> delay <s> | sound <...> | combat | enable | long | countdown | splash")
     return
   end
 
@@ -451,7 +468,7 @@ SlashCmdList["FBA"] = function(msg)
     local cfg = GetSpellCfgByName(raw)
     if not cfg then Print("Usage: /fba test <Buff Name>"); return end
     PlayAlertSound(cfg.sound)
-    if FBA.db.showAlert then
+    if FBA.db.showAlert and (cfg.showSplash ~= false) then
       if (FBA.db.alertCountdown and cfg.showCountdown) and FBA.StartCountdownSim then
         local thr = cfg.threshold or 4
         FBA:SetCountdownStep(stepForThreshold(thr))
@@ -500,11 +517,10 @@ f:SetScript("OnEvent", function()
     local spellName = arg1
     if FBA.UI_waitNextCast and spellName and spellName ~= "" then
       FBA.UI_waitNextCast = false
-      local added = spellName
-      local key = string.lower(added)
-      if not FBA.db.spells[key] then FBA.db.spells[key] = DefaultSpell(added) end
-      if FBA.UI_OnAddedFromCast then FBA:UI_OnAddedFromCast(added) end
-      Print("Added from next cast: "..added)
+      local key = string.lower(spellName)
+      if not FBA.db.spells[key] then FBA.db.spells[key] = DefaultSpell(spellName) end
+      if FBA.UI_OnAddedFromCast then FBA:UI_OnAddedFromCast(spellName) end
+      Print("Added from next cast: "..spellName)
       if FBA.UI_Refresh then FBA:UI_Refresh() end
     end
   end

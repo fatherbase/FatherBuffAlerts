@@ -1,5 +1,5 @@
 -- FatherBuffAlerts - Alerts (splash UI)
--- Version: 2.1.8
+-- Version: 2.1.9
 
 -- main alert frame
 local alertFrame = CreateFrame("Frame", "FBA_AlertFrame", UIParent)
@@ -147,7 +147,11 @@ function FBA:UpdateCountdown(label, tl)
   local lbl = label or "Buff"
   local b = quantize(self.cdStep, tl or 0)
   if self.cdLastBucket == nil or b ~= self.cdLastBucket then
-    text:SetText(lbl.." expiring in "..FormatNum(self.cdStep, b).."s")
+    local s = FormatNum(self.cdStep, b)
+    _G["FBA_AlertFrame"]:Show()
+    _G["FBA_AlertFrame"]:SetAlpha(1)
+    _G["FBA_Anchor"]:Hide()
+    text:SetText(lbl.." expiring in "..s.."s")
     self.cdLastBucket = b
   end
 end

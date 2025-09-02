@@ -1,5 +1,5 @@
 -- FatherBuffAlerts - Settings UI + Minimap button (WoW 1.12 / Lua 5.0)
--- Version: 2.1.8
+-- Version: 2.1.9
 
 -- =======================
 -- Minimap Button (standard ring style)
@@ -14,7 +14,7 @@ btn:SetFrameLevel(9)
 btn:RegisterForClicks("LeftButtonUp")
 btn:RegisterForDrag("LeftButton")
 btn:EnableMouse(true)
-btn:SetMovable(false) -- we position via angle, not by moving
+btn:SetMovable(false) -- positioned via angle
 btn:SetClampedToScreen(true)
 
 btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
@@ -70,7 +70,7 @@ function FBA:UI_PositionMinimapButton()
 end
 
 -- =======================
--- Settings Window (Spellbook left, Tracked right)
+-- Settings Window (Spellbook left, Tracked right; Buff Settings strip above)
 -- =======================
 local frame = CreateFrame("Frame", "FBA_Config", UIParent)
 frame:SetWidth(880); frame:SetHeight(600)
@@ -85,7 +85,6 @@ frame:SetMovable(true)
 frame:RegisterForDrag("LeftButton")
 frame:SetScript("OnDragStart", function() this:StartMoving() end)
 frame:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-
 tinsert(UISpecialFrames, "FBA_Config")
 
 local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
@@ -103,7 +102,7 @@ cbEnabled:SetScript("OnClick", function() if FBA and FBA.db then FBA.db.enabled 
 
 local cbSplash = CreateFrame("CheckButton", "FBA_CBSplash", frame, "UICheckButtonTemplate")
 cbSplash:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -72)
-FBA_CBSplashText:SetText("Show on-screen splash")
+FBA_CBSplashText:SetText("Show on-screen splash (global)")
 cbSplash:SetScript("OnClick", function() if FBA and FBA.db then FBA.db.showAlert = FBA_CBSplash:GetChecked() end end)
 
 local cbCountdown = CreateFrame("CheckButton", "FBA_CBCountdown", frame, "UICheckButtonTemplate")
@@ -126,10 +125,135 @@ cbMinimap:SetScript("OnClick", function()
   end
 end)
 
+-- ===== Buff Settings STRIP (above lists, next to global toggles)
+local detBG = CreateFrame("Frame", nil, frame)
+detBG:SetWidth(840); detBG:SetHeight(120)
+detBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -140)  -- directly under global toggles
+detBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+                    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+                    tile = true, tileSize = 16, edgeSize = 12,
+                    insets = { left=3, right=3, top=3, bottom=3 } })
+detBG:SetBackdropColor(0,0,0,0.5)
+
+local detTitle = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+detTitle:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -8)
+detTitle:SetText("Buff Settings")
+
+local lblName = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+lblName:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -36)
+lblName:SetText("Name: ")
+
+local txtName = detBG:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+txtName:SetPoint("LEFT", lblName, "RIGHT", 4, 0)
+txtName:SetText("—")
+
+local cbSpellEnabled = CreateFrame("CheckButton", "FBA_CBSpellEnabled", detBG, "UICheckButtonTemplate")
+cbSpellEnabled:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -60)
+FBA_CBSpellEnabledText:SetText("Enable this buff")
+cbSpellEnabled:SetScript("OnClick", function()
+  local key = FBA.UI_selectedKey
+  if key and FBA.db and FBA.db.spells[key] then
+    FBA.db.spells[key].enabled = FBA_CBSpellEnabled:GetChecked()
+    FBA:UI_Refresh()
+  end
+end)
+
+local cbBuffSplash = CreateFrame("CheckButton", "FBA_CBBuffSplash", detBG, "UICheckButtonTemplate")
+cbBuffSplash:SetPoint("LEFT", FBA_CBSpellEnabled, "RIGHT", 140, 0)
+FBA_CBBuffSplashText:SetText("On-screen splash for this buff")
+cbBuffSplash:SetScript("OnClick", function()
+  local key = FBA.UI_selectedKey
+  if key and FBA.db and FBA.db.spells[key] then
+    FBA.db.spells[key].showSplash = FBA_CBBuffSplash:GetChecked()
+  end
+end)
+
+local cbCombat = CreateFrame("CheckButton", "FBA_CBCombat", detBG, "UICheckButtonTemplate")
+cbCombat:SetPoint("LEFT", FBA_CBBuffSplash, "RIGHT", 140, 0)
+FBA_CBCombatText:SetText("Only alert in combat")
+cbCombat:SetScript("OnClick", function()
+  local key = FBA.UI_selectedKey
+  if key and FBA.db and FBA.db.spells[key] then
+    FBA.db.spells[key].combatOnly = FBA_CBCombat:GetChecked()
+  end
+end)
+
+local cbLong = CreateFrame("CheckButton", "FBA_CBLong", detBG, "UICheckButtonTemplate")
+cbLong:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -86)
+FBA_CBLongText:SetText("5m reminder for ≥9m buffs")
+cbLong:SetScript("OnClick", function()
+  local key = FBA.UI_selectedKey
+  if key and FBA.db and FBA.db.spells[key] then
+    FBA.db.spells[key].useLongReminder = FBA_CBLong:GetChecked()
+  end
+end)
+
+local cbCD = CreateFrame("CheckButton", "FBA_CBCDown", detBG, "UICheckButtonTemplate")
+cbCD:SetPoint("LEFT", FBA_CBLong, "RIGHT", 140, 0)
+FBA_CBCDownText:SetText("Live countdown for this buff")
+cbCD:SetScript("OnClick", function()
+  local key = FBA.UI_selectedKey
+  if key and FBA.db and FBA.db.spells[key] then
+    FBA.db.spells[key].showCountdown = FBA_CBCDown:GetChecked()
+  end
+end)
+
+local lblDelay = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+lblDelay:SetPoint("LEFT", FBA_CBCDown, "RIGHT", 140, 0)
+lblDelay:SetText("Delay (s):")
+
+local ebDelay = CreateFrame("EditBox", "FBA_EBDelay", detBG, "InputBoxTemplate")
+ebDelay:SetWidth(60); ebDelay:SetHeight(20)
+ebDelay:SetPoint("LEFT", lblDelay, "RIGHT", 6, 0)
+ebDelay:SetAutoFocus(false)
+ebDelay:SetScript("OnEnterPressed", function() this:ClearFocus() end)
+
+local lblSound = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+lblSound:SetPoint("LEFT", FBA_EBDelay, "RIGHT", 16, 0)
+lblSound:SetText("Sound:")
+
+local ddSound = CreateFrame("Button", "FBA_DDSound", detBG, "UIPanelButtonTemplate")
+ddSound:SetWidth(100); ddSound:SetHeight(20)
+ddSound:SetPoint("LEFT", lblSound, "RIGHT", 6, 0)
+ddSound._mode = "default"
+ddSound:SetText("default")
+ddSound:SetScript("OnClick", function()
+  local m = FBA_DDSound._mode
+  if m == "default" then m = "none"
+  elseif m == "none" then m = "custom"
+  else m = "default" end
+  FBA_DDSound._mode = m
+  FBA_DDSound:SetText(m)
+  if m == "custom" then FBA_EBSoundPath:Show() else FBA_EBSoundPath:Hide() end
+  local key = FBA.UI_selectedKey
+  if key and FBA.db and FBA.db.spells[key] then
+    if m == "custom" then
+      local p = FBA_EBSoundPath:GetText()
+      FBA.db.spells[key].sound = (p and p ~= "" and p) or "default"
+    else
+      FBA.db.spells[key].sound = m
+    end
+  end
+end)
+
+local ebSound = CreateFrame("EditBox", "FBA_EBSoundPath", detBG, "InputBoxTemplate")
+ebSound:SetWidth(220); ebSound:SetHeight(20)
+ebSound:SetPoint("LEFT", ddSound, "RIGHT", 6, 0)
+ebSound:SetAutoFocus(false)
+ebSound:Hide()
+ebSound:SetScript("OnTextChanged", function()
+  local key = FBA.UI_selectedKey
+  if key and FBA.db and FBA.db.spells[key] and FBA_DDSound._mode == "custom" then
+    local v = FBA_EBSoundPath:GetText()
+    FBA.db.spells[key].sound = (v and v ~= "" and v) or "default"
+  end
+end)
+
+-- ===== Lists (moved down so the strip sits above)
 -- Left: Spellbook panel
 local bookBG = CreateFrame("Frame", nil, frame)
-bookBG:SetWidth(380); bookBG:SetHeight(390)
-bookBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -160)
+bookBG:SetWidth(380); bookBG:SetHeight(320)
+bookBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -280)
 bookBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                      edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
                      tile = true, tileSize = 16, edgeSize = 12,
@@ -163,8 +287,8 @@ bookFilter:SetScript("OnTextChanged", function() FBA:UI_Refresh() end)
 
 -- Right: Tracked panel
 local trackedBG = CreateFrame("Frame", nil, frame)
-trackedBG:SetWidth(380); trackedBG:SetHeight(390)
-trackedBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 480, -160)
+trackedBG:SetWidth(380); trackedBG:SetHeight(320)
+trackedBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 480, -280)
 trackedBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
                         tile = true, tileSize = 16, edgeSize = 12,
@@ -212,7 +336,7 @@ for i=1,visibleRows do
     if r._name and FBA and FBA.db then
       local key = string.lower(r._name)
       if not FBA.db.spells[key] then
-        FBA.db.spells[key] = { name = r._name, enabled = true, threshold = 4, sound = "default", combatOnly=false, useLongReminder=true, showCountdown=true }
+        FBA.db.spells[key] = { name = r._name, enabled = true, threshold = 4, sound = "default", combatOnly=false, useLongReminder=true, showCountdown=true, showSplash=true }
         DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Added '"..r._name.."'")
         FBA:UI_Refresh()
       else
@@ -230,10 +354,10 @@ for i=1,visibleRows do
   r:Hide(); trackedRows[i] = r
 end
 
--- Bottom controls (centered below panels, not overlapping)
+-- Bottom controls (well above bottom edge; no overlap)
 local addBox = CreateFrame("EditBox", "FBA_AddBox", frame, "InputBoxTemplate")
 addBox:SetWidth(300); addBox:SetHeight(20)
-addBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -560)
+addBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -520)
 addBox:SetAutoFocus(false)
 
 local addBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
@@ -245,7 +369,7 @@ addBtn:SetScript("OnClick", function()
   if nm and nm ~= "" and FBA and FBA.db then
     local key = string.lower(nm)
     if not FBA.db.spells[key] then
-      FBA.db.spells[key] = { name = nm, enabled = true, threshold = 4, sound = "default", combatOnly=false, useLongReminder=true, showCountdown=true }
+      FBA.db.spells[key] = { name = nm, enabled = true, threshold = 4, sound = "default", combatOnly=false, useLongReminder=true, showCountdown=true, showSplash=true }
       FBA_AddBox:SetText("")
       FBA:UI_Refresh()
       DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Added '"..nm.."'")
@@ -256,126 +380,12 @@ addBtn:SetScript("OnClick", function()
 end)
 
 local addNextBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-addNextBtn:SetWidth(120); addNextBtn:SetHeight(22)
+addNextBtn:SetWidth(140); addNextBtn:SetHeight(22)
 addNextBtn:SetPoint("LEFT", addBtn, "RIGHT", 8, 0)
 addNextBtn:SetText("Add Next Cast")
 addNextBtn:SetScript("OnClick", function()
   FBA.UI_waitNextCast = true
   DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Watching your next cast; the spell you cast next will be added automatically.")
-end)
-
--- Right detail panel (to the far right)
-local detBG = CreateFrame("Frame", nil, frame)
-detBG:SetWidth(360); detBG:SetHeight(200)
-detBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 480, -560)
-detBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-                    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-                    tile = true, tileSize = 16, edgeSize = 12,
-                    insets = { left=3, right=3, top=3, bottom=3 } })
-detBG:SetBackdropColor(0,0,0,0.5)
-
-local detTitle = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-detTitle:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -8)
-detTitle:SetText("Buff Settings")
-
-local lblName = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lblName:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -36)
-lblName:SetText("Name: ")
-
-local txtName = detBG:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-txtName:SetPoint("LEFT", lblName, "RIGHT", 4, 0)
-txtName:SetText("—")
-
-local cbSpellEnabled = CreateFrame("CheckButton", "FBA_CBSpellEnabled", detBG, "UICheckButtonTemplate")
-cbSpellEnabled:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -60)
-FBA_CBSpellEnabledText:SetText("Enable this buff")
-cbSpellEnabled:SetScript("OnClick", function()
-  local key = FBA.UI_selectedKey
-  if key and FBA.db and FBA.db.spells[key] then
-    FBA.db.spells[key].enabled = FBA_CBSpellEnabled:GetChecked()
-    FBA:UI_Refresh()
-  end
-end)
-
-local cbCombat = CreateFrame("CheckButton", "FBA_CBCombat", detBG, "UICheckButtonTemplate")
-cbCombat:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -84)
-FBA_CBCombatText:SetText("Only alert in combat")
-cbCombat:SetScript("OnClick", function()
-  local key = FBA.UI_selectedKey
-  if key and FBA.db and FBA.db.spells[key] then
-    FBA.db.spells[key].combatOnly = FBA_CBCombat:GetChecked()
-  end
-end)
-
-local cbLong = CreateFrame("CheckButton", "FBA_CBLong", detBG, "UICheckButtonTemplate")
-cbLong:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -108)
-FBA_CBLongText:SetText("5m reminder for ≥9m buffs")
-cbLong:SetScript("OnClick", function()
-  local key = FBA.UI_selectedKey
-  if key and FBA.db and FBA.db.spells[key] then
-    FBA.db.spells[key].useLongReminder = FBA_CBLong:GetChecked()
-  end
-end)
-
-local cbCD = CreateFrame("CheckButton", "FBA_CBCDown", detBG, "UICheckButtonTemplate")
-cbCD:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -132)
-FBA_CBCDownText:SetText("Live countdown for this buff")
-cbCD:SetScript("OnClick", function()
-  local key = FBA.UI_selectedKey
-  if key and FBA.db and FBA.db.spells[key] then
-    FBA.db.spells[key].showCountdown = FBA_CBCDown:GetChecked()
-  end
-end)
-
-local lblDelay = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lblDelay:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -160)
-lblDelay:SetText("Delay (seconds):")
-
-local ebDelay = CreateFrame("EditBox", "FBA_EBDelay", detBG, "InputBoxTemplate")
-ebDelay:SetWidth(80); ebDelay:SetHeight(20)
-ebDelay:SetPoint("LEFT", lblDelay, "RIGHT", 8, 0)
-ebDelay:SetAutoFocus(false)
-ebDelay:SetScript("OnEnterPressed", function() this:ClearFocus() end)
-
-local lblSound = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lblSound:SetPoint("TOPLEFT", detBG, "TOPLEFT", 200, -160)
-lblSound:SetText("Sound:")
-
-local ddSound = CreateFrame("Button", "FBA_DDSound", detBG, "UIPanelButtonTemplate")
-ddSound:SetWidth(100); ddSound:SetHeight(20)
-ddSound:SetPoint("LEFT", lblSound, "RIGHT", 8, 0)
-ddSound._mode = "default"
-ddSound:SetText("default")
-ddSound:SetScript("OnClick", function()
-  local m = FBA_DDSound._mode
-  if m == "default" then m = "none"
-  elseif m == "none" then m = "custom"
-  else m = "default" end
-  FBA_DDSound._mode = m
-  FBA_DDSound:SetText(m)
-  if m == "custom" then FBA_EBSoundPath:Show() else FBA_EBSoundPath:Hide() end
-  local key = FBA.UI_selectedKey
-  if key and FBA.db and FBA.db.spells[key] then
-    if m == "custom" then
-      local p = FBA_EBSoundPath:GetText()
-      FBA.db.spells[key].sound = (p and p ~= "" and p) or "default"
-    else
-      FBA.db.spells[key].sound = m
-    end
-  end
-end)
-
-local ebSound = CreateFrame("EditBox", "FBA_EBSoundPath", detBG, "InputBoxTemplate")
-ebSound:SetWidth(200); ebSound:SetHeight(20)
-ebSound:SetPoint("LEFT", ddSound, "RIGHT", 8, 0)
-ebSound:SetAutoFocus(false)
-ebSound:Hide()
-ebSound:SetScript("OnTextChanged", function()
-  local key = FBA.UI_selectedKey
-  if key and FBA.db and FBA.db.spells[key] and FBA_DDSound._mode == "custom" then
-    local v = FBA_EBSoundPath:GetText()
-    FBA.db.spells[key].sound = (v and v ~= "" and v) or "default"
-  end
 end)
 
 -- Paging state
@@ -479,6 +489,7 @@ function FBA:UI_RefreshDetail()
     local sp = FBA.db.spells[key]
     txtName:SetText(sp.name or "—")
     FBA_CBSpellEnabled:SetChecked(sp.enabled and 1 or 0)
+    FBA_CBBuffSplash:SetChecked((sp.showSplash ~= false) and 1 or 0)
     FBA_CBCombat:SetChecked(sp.combatOnly and 1 or 0)
     FBA_CBLong:SetChecked(sp.useLongReminder and 1 or 0)
     FBA_CBCDown:SetChecked((sp.showCountdown ~= false) and 1 or 0)
@@ -495,6 +506,7 @@ function FBA:UI_RefreshDetail()
   else
     txtName:SetText("—")
     FBA_CBSpellEnabled:SetChecked(0)
+    FBA_CBBuffSplash:SetChecked(1)
     FBA_CBCombat:SetChecked(0)
     FBA_CBLong:SetChecked(1)
     FBA_CBCDown:SetChecked(1)
@@ -530,7 +542,6 @@ end
 
 -- UI callback from "add next cast"
 function FBA:UI_OnAddedFromCast(spellName)
-  -- Try to focus it on the tracked panel
   local key = string.lower(spellName or "")
   if self.db and self.db.spells[key] then
     self.UI_selectedKey = key
