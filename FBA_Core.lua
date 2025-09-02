@@ -1,6 +1,6 @@
 -- FatherBuffAlerts (WoW 1.12 / Lua 5.0)
 -- Core logic: DB, multi-buff scanning, sounds, countdown hooks, slash commands.
--- Version: 2.1.10
+-- Version: 2.1.10 (alert fade + duplicate sound fix)
 
 FBA = FBA or {}
 
@@ -40,7 +40,7 @@ local function DefaultSpell(name)
     sound = "default",      -- "default" | "none" | <path>
     combatOnly = false,
     useLongReminder = true, -- if instance lasts >= 9m, also remind at 5m
-    showCountdown = true,   -- per-buff live countdown
+    showCountdown = true,   -- per-buff live countdown (used only when threshold ≤ 10s)
     showSplash = true,      -- per-buff on-screen splash
   }
 end
@@ -136,15 +136,18 @@ function FBA:OnUpdate(elapsed)
 
       if a and a.tl then
         -- track max to detect long buffs / reapplications
-        if (not rt.seenMaxTL) or (a.tl > rt.seenMaxTL) then rt.seenMaxTL = a.tl; rt.shortPlayed = false; rt.longPlayed = false end
+        if (not rt.seenMaxTL) or (a.tl > rt.seenMaxTL) then
+          rt.seenMaxTL = a.tl
+          -- Do NOT reset shortPlayed here; only reset when buff disappears.
+          -- This avoids duplicate sounds from spurious aura-change pulses.
+        end
 
-        -- 5m reminder for long instances (no countdown)
+        -- 5m reminder for long instances (no countdown, always fade)
         if sp.useLongReminder and rt.seenMaxTL and rt.seenMaxTL >= 540 then
           if (not rt.longPlayed) and (a.tl <= 300 + self.EPSILON) and (a.tl > (sp.threshold or 4) + self.EPSILON) then
             if (not sp.combatOnly) or InCombat() then
               PlayAlertSound(sp.sound)
               if self.db.showAlert and sp.showSplash and self.ShowStatic then
-                -- soft 3s fade for big numbers
                 self:ShowStatic(sp.name.." has ~5 minutes remaining", 3)
               end
             end
@@ -157,22 +160,20 @@ function FBA:OnUpdate(elapsed)
         -- per-buff threshold alert (single-fire on downward crossing)
         local thr = sp.threshold or 4
         local prev = rt.prevTL
-        if prev and (prev <= (thr + self.EPSILON)) then
-          -- already below threshold
-        else
+        if (not prev) or (prev > thr + self.EPSILON) then
           if (a.tl <= (thr + self.EPSILON)) and not rt.shortPlayed then
             if (not sp.combatOnly) or InCombat() then
               PlayAlertSound(sp.sound)
               if self.db.showAlert and sp.showSplash then
-                local useCD = (self.db.alertCountdown and sp.showCountdown)
+                -- Only show a live countdown when threshold ≤ 10s.
+                local useCD = (thr <= 10) and (self.db.alertCountdown and sp.showCountdown)
                 if useCD and self.StartCountdown then
                   self:SetCountdownStep(stepForThreshold(thr))
                   self:StartCountdown(sp.name, a.tl)
                   self.activeKey = key
                 else
-                  local secs = math.floor(thr + 0.5)
-                  local totalDur = (thr > 10) and 3 or nil
-                  if self.ShowStatic then self:ShowStatic(sp.name.." expiring in "..secs.." seconds", totalDur) end
+                  -- Always fade short "toast" alerts (even for big thresholds)
+                  if self.ShowStatic then self:ShowStatic(sp.name.." expiring in "..math.floor(thr + 0.5).." seconds", 3) end
                   self.activeKey = nil
                 end
               end
@@ -181,8 +182,8 @@ function FBA:OnUpdate(elapsed)
           end
         end
 
-        -- track the “soonest” one for live updates
-        if (a.tl <= (thr + self.EPSILON)) then
+        -- track the “soonest” one for live updates (only if countdown is allowed)
+        if (a.tl <= (thr + self.EPSILON)) and (thr <= 10) then
           if (not soonestTL) or a.tl < soonestTL then
             soonestTL = a.tl
             soonestKey = key
@@ -194,13 +195,16 @@ function FBA:OnUpdate(elapsed)
 
         rt.prevTL = a.tl
       else
-        -- buff not present; clear runtime markers
-        rt.longPlayed = false; rt.shortPlayed = false; rt.seenMaxTL = nil; rt.prevTL = nil
+        -- buff not present; clear runtime markers (re-arm)
+        rt.longPlayed = false
+        rt.shortPlayed = false
+        rt.seenMaxTL = nil
+        rt.prevTL = nil
       end
     end
   end
 
-  -- keep the live countdown text current for the nearest one (if per-buff splash+countdown enabled)
+  -- keep the live countdown text current for the nearest one (only when thr ≤ 10)
   if self.db.showAlert and soonestShowCD and soonestKey and active[soonestKey] then
     local tl = active[soonestKey].tl or 0
     self:SetCountdownStep(stepForThreshold(soonestThr))
@@ -216,7 +220,8 @@ function FBA:OnUpdate(elapsed)
   end
 end
 
--- ---- Slash helpers
+-- ---- Slash helpers (unchanged — trimmed here for brevity in comments)
+
 local function ShowHelp()
   Print("FatherBuffAlerts v"..FBA.version.." — Commands:")
   Print("  /fba settings                 - Open settings window.")
@@ -231,7 +236,7 @@ local function ShowHelp()
   Print("  /fba set <Buff> combat        - Toggle per-buff combat-only.")
   Print("  /fba set <Buff> enable        - Toggle per-buff enable.")
   Print("  /fba set <Buff> long          - Toggle 5m reminder for ≥9m.")
-  Print("  /fba set <Buff> countdown     - Toggle per-buff live countdown.")
+  Print("  /fba set <Buff> countdown     - Toggle per-buff live countdown (≤10s only).")
   Print("  /fba set <Buff> splash        - Toggle per-buff on-screen splash.")
   Print("  /fba alert                    - Toggle on-screen splash (global).")
   Print("  /fba countdown                - Toggle global live countdown.")
@@ -309,16 +314,8 @@ SlashCmdList["FBA"] = function(msg)
   local lower = string.lower(msg)
 
   if lower == "" or string.find(lower, "^help") then ShowHelp(); return end
-
   if lower == "settings" then if FBA.UI_Show then FBA:UI_Show() else Print("UI not loaded.") end; return end
-
-  if lower == "enable" then
-    FBA.db.enabled = not FBA.db.enabled
-    Print("Addon enabled: "..(FBA.db.enabled and "ON" or "OFF")..".")
-    if FBA.UI_Refresh then FBA:UI_Refresh() end
-    return
-  end
-
+  if lower == "enable" then FBA.db.enabled = not FBA.db.enabled; Print("Addon enabled: "..(FBA.db.enabled and "ON" or "OFF").."."); if FBA.UI_Refresh then FBA:UI_Refresh() end; return end
   if lower == "list" then ListTracked(); return end
 
   local addArg = ParseAfter(lower, "add")
@@ -412,7 +409,7 @@ SlashCmdList["FBA"] = function(msg)
       local nm = string.sub(raw, 1, cdpos-1)
       local cfg = GetSpellCfgByName(nm); if not cfg then Print("Unknown buff '"..(nm or "").."'"); return end
       cfg.showCountdown = not cfg.showCountdown
-      Print("Live countdown for '"..cfg.name.."': "..(cfg.showCountdown and "ON" or "OFF"))
+      Print("Live countdown for '"..cfg.name.."': "..(cfg.showCountdown and "ON" or "OFF").." (≤10s thresholds only)")
       if FBA.UI_Refresh then FBA:UI_Refresh() end
       return
     end
@@ -469,13 +466,12 @@ SlashCmdList["FBA"] = function(msg)
     if not cfg then Print("Usage: /fba test <Buff Name>"); return end
     PlayAlertSound(cfg.sound)
     if FBA.db.showAlert and (cfg.showSplash ~= false) then
-      if (FBA.db.alertCountdown and cfg.showCountdown) and FBA.StartCountdownSim then
-        local thr = cfg.threshold or 4
+      local thr = cfg.threshold or 4
+      if (FBA.db.alertCountdown and cfg.showCountdown and thr <= 10) and FBA.StartCountdownSim then
         FBA:SetCountdownStep(stepForThreshold(thr))
         FBA:StartCountdownSim(cfg.name, thr)
       elseif FBA.ShowStatic then
-        local secs = math.floor((cfg.threshold or 4) + 0.5)
-        FBA:ShowStatic(cfg.name.." expiring in "..secs.." seconds", (secs > 10) and 3 or nil)
+        FBA:ShowStatic(cfg.name.." expiring in "..math.floor(thr + 0.5).." seconds", 3)
       end
     end
     return
@@ -511,8 +507,12 @@ f:SetScript("OnEvent", function()
       if FBA.UI_Show then FBA:UI_Show() end
       FBA.db.firstRunDone = true
     end
-  elseif event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_AURAS_CHANGED" then
+  elseif event == "PLAYER_ENTERING_WORLD" then
+    -- optional rearm on full zone load
     for key, rt in pairs(FBA.rt) do rt.shortPlayed = false; rt.longPlayed = false; rt.seenMaxTL = nil; rt.prevTL = nil end
+  elseif event == "PLAYER_AURAS_CHANGED" then
+    -- Do NOT reset here (to avoid duplicate sounds).
+    -- OnUpdate already re-arms when a buff disappears.
   elseif event == "SPELLCAST_START" then
     local spellName = arg1
     if FBA.UI_waitNextCast and spellName and spellName ~= "" then
