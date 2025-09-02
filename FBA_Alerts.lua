@@ -1,5 +1,5 @@
 -- FatherBuffAlerts - Alerts (splash UI)
--- Version: 2.1.5
+-- Version: 2.1.6
 
 -- main alert frame
 local alertFrame = CreateFrame("Frame", "FBA_AlertFrame", UIParent)
@@ -123,7 +123,13 @@ function FBA:AlertOnUpdate(elapsed)
       if self.cdSimTL <= 0 then
         self:HideAlert()
       else
-        text:SetText((self.cdSimLabel or "Buff").." expiring in "..Format1(self.cdSimTL).."s")
+        local lbl = self.cdSimLabel or "Buff"
+        local tl  = self.cdSimTL
+        _G["FBA_AlertFrame"]:Show()
+        _G["FBA_AlertFrame"]:SetAlpha(1)
+        _G["FBA_Anchor"]:Hide()
+        local s = string.format("%.1f", (tl < 0 and 0) or tl)
+        text:SetText(lbl.." expiring in "..s.."s")
       end
     end
     return

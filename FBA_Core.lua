@@ -1,11 +1,11 @@
 -- FatherBuffAlerts (WoW 1.12 / Lua 5.0)
 -- Core logic: DB, multi-buff scanning, sounds, countdown hooks, slash commands.
--- Version: 2.1.5
+-- Version: 2.1.6
 
 FBA = FBA or {}
 
 -- ---- Core state / constants
-FBA.version    = "2.1.5"
+FBA.version    = "2.1.6"
 FBA.timer      = FBA.timer or 0          -- ~10 Hz scan throttle
 FBA.EPSILON    = FBA.EPSILON or 0.15     -- small cushion for frame timing
 FBA.rt         = FBA.rt or {}            -- runtime flags per tracked buff key
@@ -194,7 +194,7 @@ local function ShowHelp()
   Print("  /fba add <Buff Name>       - Track a new buff.")
   Print("  /fba add #<n>              - Add from last /fba suggest by index.")
   Print("  /fba remove <Buff Name>    - Stop tracking a buff.")
-  Print("  /fba suggest [filter]      - List spellbook names.")
+  Print("  /fba suggest [filter]      - List spellbook names (actives first).")
   Print("  /fba set <Buff> delay <s>  - Set per-buff delay.")
   Print("  /fba set <Buff> sound default|none|<path>")
   Print("  /fba set <Buff> combat     - Toggle per-buff combat-only.")

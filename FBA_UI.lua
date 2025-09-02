@@ -1,11 +1,12 @@
 -- FatherBuffAlerts - Settings UI + Minimap button (WoW 1.12 / Lua 5.0)
--- Version: 2.1.5
+-- Version: 2.1.6
 
 -- =======================
 -- Minimap Button
 -- =======================
-local iconPath = "Interface\\Icons\\Ability_Druid_TigersFury"
-local fallbackIcon = "Interface\\Icons\\INV_Misc_QuestionMark"
+-- Use a very safe Blizzard icon (Cat Form) to avoid '?' fallback on some 1.12 clients.
+local iconPathPrimary  = "Interface\\Icons\\Ability_Druid_CatForm"
+local iconPathFallback = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local btn = CreateFrame("Button", "FBA_MinimapButton", Minimap)
 btn:SetWidth(32); btn:SetHeight(32)
@@ -24,8 +25,9 @@ btn:SetPoint("CENTER", Minimap, "CENTER", 0, 0)
 local ic = btn:CreateTexture("FBA_MinimapButtonIcon", "ARTWORK")
 ic:SetAllPoints(btn)
 ic:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-ic:SetTexture(iconPath)
-if not ic:GetTexture() then ic:SetTexture(fallbackIcon) end
+ic:SetTexture(iconPathPrimary)
+-- keep a manual toggle so users never get stuck with '?'
+if not ic:GetTexture() or ic:GetTexture() == "" then ic:SetTexture(iconPathFallback) end
 
 btn:SetNormalTexture(nil)
 btn:SetPushedTexture(nil)
@@ -66,7 +68,7 @@ end
 -- Settings Window
 -- =======================
 local frame = CreateFrame("Frame", "FBA_Config", UIParent)
-frame:SetWidth(740); frame:SetHeight(520)
+frame:SetWidth(760); frame:SetHeight(540)
 frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 frame:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
                     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
@@ -78,6 +80,9 @@ frame:SetMovable(true)
 frame:RegisterForDrag("LeftButton")
 frame:SetScript("OnDragStart", function() this:StartMoving() end)
 frame:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+
+-- ESC close support
+tinsert(UISpecialFrames, "FBA_Config")
 
 local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
 title:SetPoint("TOP", frame, "TOP", 0, -16)
@@ -130,7 +135,7 @@ tabBook:SetText("Spellbook")
 
 -- Left list container (reused by both tabs)
 local listBG = CreateFrame("Frame", nil, frame)
-listBG:SetWidth(320); listBG:SetHeight(300)
+listBG:SetWidth(340); listBG:SetHeight(320)
 listBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -180)
 listBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                      edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -159,13 +164,13 @@ btnNext:SetPoint("LEFT", pageText, "RIGHT", 6, 0)
 btnNext:SetText(">")
 
 -- Rows with optional icon
-local visibleRows = 10
+local visibleRows = 11
 local trackedRows, bookRows = {}, {}
 
 -- tracked rows (text only)
 for i=1,visibleRows do
   local b = CreateFrame("Button", nil, listBG, "UIPanelButtonTemplate")
-  b:SetWidth(280); b:SetHeight(22)
+  b:SetWidth(300); b:SetHeight(22)
   b:SetPoint("TOPLEFT", listBG, "TOPLEFT", 18, -24 - (i-1)*26)
   b:SetText("")
   b:SetScript("OnClick", function() FBA.UI_selectedKey = b._key; FBA:UI_RefreshDetail() end)
@@ -175,7 +180,7 @@ end
 -- spellbook rows (icon + name)
 for i=1,visibleRows do
   local row = CreateFrame("Button", nil, listBG, "UIPanelButtonTemplate")
-  row:SetWidth(280); row:SetHeight(22)
+  row:SetWidth(300); row:SetHeight(22)
   row:SetPoint("TOPLEFT", listBG, "TOPLEFT", 18, -24 - (i-1)*26)
   row._icon = row:CreateTexture(nil, "OVERLAY") -- ensure above button skin
   row._icon:SetWidth(18); row._icon:SetHeight(18)
@@ -183,9 +188,7 @@ for i=1,visibleRows do
   row._label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   row._label:SetPoint("LEFT", row._icon, "RIGHT", 6, 0)
   row:SetScript("OnClick", function()
-    if row._name then
-      FBA_AddBox:SetText(row._name)
-    end
+    if row._name then FBA_AddBox:SetText(row._name) end
   end)
   row:Hide()
   bookRows[i] = row
@@ -193,8 +196,8 @@ end
 
 -- Add/custom and Add Next Cast
 local addBox = CreateFrame("EditBox", "FBA_AddBox", frame, "InputBoxTemplate")
-addBox:SetWidth(260); addBox:SetHeight(20)
-addBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -490)
+addBox:SetWidth(280); addBox:SetHeight(20)
+addBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -515)
 addBox:SetAutoFocus(false)
 
 local addBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
@@ -217,7 +220,7 @@ addBtn:SetScript("OnClick", function()
 end)
 
 local addNextBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-addNextBtn:SetWidth(110); addNextBtn:SetHeight(22)
+addNextBtn:SetWidth(120); addNextBtn:SetHeight(22)
 addNextBtn:SetPoint("LEFT", addBtn, "RIGHT", 8, 0)
 addNextBtn:SetText("Add Next Cast")
 addNextBtn:SetScript("OnClick", function()
@@ -227,8 +230,8 @@ end)
 
 -- Right detail panel
 local detBG = CreateFrame("Frame", nil, frame)
-detBG:SetWidth(360); detBG:SetHeight(300)
-detBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 360, -180)
+detBG:SetWidth(360); detBG:SetHeight(320)
+detBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 380, -180)
 detBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
                     tile = true, tileSize = 16, edgeSize = 12,
@@ -372,7 +375,7 @@ end)
 -- Data / paging
 FBA.UI_tab = "tracked"
 FBA.UI_page = 1
-FBA.UI_book = {}  -- { {name=, texture=} ... }
+FBA.UI_book = {}  -- { {name=, texture=, active?=} ... }
 local function updatePageIndicator(totalCount)
   local per = visibleRows
   local totalPages = math.max(1, math.ceil((totalCount or 0) / per))
@@ -387,9 +390,9 @@ function FBA:UI_SwitchTab(which)
     listTitle:SetText("Tracked Buffs")
     for i=1,visibleRows do trackedRows[i]:Show(); bookRows[i]:Hide() end
   else
-    listTitle:SetText("Spellbook (click a spell, then + Add)")
-    -- build book list with icons
-    FBA.UI_book = FBA:GatherSpellbookEntries()
+    listTitle:SetText("Spellbook (actives first; click a spell, then + Add)")
+    -- build book list with actives first
+    FBA.UI_book = FBA:BuildBookList(nil)
     for i=1,visibleRows do trackedRows[i]:Hide(); bookRows[i]:Show() end
   end
   FBA.UI_page = 1
@@ -426,6 +429,11 @@ function FBA:UI_Refresh()
   FBA_CBMinimap:SetChecked(FBA.db.minimap.show and 1 or 0)
 
   if FBA.UI_tab == "book" then
+    -- (re)build with filter
+    local filter = FBA_BookFilter and FBA_BookFilter:GetText() or ""
+    local fl = (filter and filter ~= "" and string.lower(filter)) or nil
+    FBA.UI_book = FBA:BuildBookList(fl)
+
     local all = FBA.UI_book or {}
     local per = visibleRows
     updatePageIndicator(table.getn(all))
@@ -437,7 +445,9 @@ function FBA:UI_Refresh()
       if entry then
         w._name = entry.name
         w._icon:SetTexture(entry.texture or "Interface\\Icons\\INV_Misc_QuestionMark")
-        w._label:SetText(entry.name)
+        local label = entry.name
+        if entry.active then label = label.." |cff55ff55(active)|r" end
+        w._label:SetText(label)
         w:Show()
       else
         w._name = nil
@@ -480,6 +490,19 @@ function FBA:UI_Refresh()
   FBA:UI_RefreshDetail()
 end
 
+-- Spellbook filter box
+local bookFilter = CreateFrame("EditBox", "FBA_BookFilter", frame, "InputBoxTemplate")
+bookFilter:SetWidth(300); bookFilter:SetHeight(20)
+bookFilter:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -510)
+bookFilter:SetAutoFocus(false)
+bookFilter:Hide()
+bookFilter:SetScript("OnTextChanged", function() FBA:UI_Refresh() end)
+
+-- show/hide filter with tab
+hooksecurefunc("FBA:UI_SwitchTab", function(which)
+  -- (hooksecurefunc isn’t really in 1.12, but leaving harmlessly—no effect if absent)
+end)
+
 function FBA:UI_RefreshDetail()
   local key = FBA.UI_selectedKey
   if key and FBA.db and FBA.db.spells[key] then
@@ -512,6 +535,14 @@ end
 
 function FBA:UI_Show()
   FBA_Config:Show()
+  -- toggle the filter visibility depending on tab
+  if (FBA.UI_tab or "tracked") == "book" then
+    listTitle:SetText("Spellbook (actives first; click a spell, then + Add)")
+    if FBA_BookFilter then FBA_BookFilter:Show() end
+  else
+    listTitle:SetText("Tracked Buffs")
+    if FBA_BookFilter then FBA_BookFilter:Hide() end
+  end
   FBA:UI_SwitchTab(FBA.UI_tab or "tracked")
 end
 function FBA:UI_Hide() FBA_Config:Hide() end
