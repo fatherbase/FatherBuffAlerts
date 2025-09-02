@@ -1,5 +1,5 @@
 -- FatherBuffAlerts - Alerts (splash UI)
--- Version: 2.1.6
+-- Version: 2.1.7
 
 -- main alert frame
 local alertFrame = CreateFrame("Frame", "FBA_AlertFrame", UIParent)
@@ -125,10 +125,11 @@ function FBA:AlertOnUpdate(elapsed)
       else
         local lbl = self.cdSimLabel or "Buff"
         local tl  = self.cdSimTL
+        local s = string.format("%.1f", (tl < 0 and 0) or tl)
         _G["FBA_AlertFrame"]:Show()
         _G["FBA_AlertFrame"]:SetAlpha(1)
         _G["FBA_Anchor"]:Hide()
-        local s = string.format("%.1f", (tl < 0 and 0) or tl)
+        _G["FBA_AlertFrame"]:SetAlpha(1)
         text:SetText(lbl.." expiring in "..s.."s")
       end
     end

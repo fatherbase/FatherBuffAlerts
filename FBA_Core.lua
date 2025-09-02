@@ -1,11 +1,11 @@
 -- FatherBuffAlerts (WoW 1.12 / Lua 5.0)
 -- Core logic: DB, multi-buff scanning, sounds, countdown hooks, slash commands.
--- Version: 2.1.6
+-- Version: 2.1.7
 
 FBA = FBA or {}
 
 -- ---- Core state / constants
-FBA.version    = "2.1.6"
+FBA.version    = "2.1.7"
 FBA.timer      = FBA.timer or 0          -- ~10 Hz scan throttle
 FBA.EPSILON    = FBA.EPSILON or 0.15     -- small cushion for frame timing
 FBA.rt         = FBA.rt or {}            -- runtime flags per tracked buff key

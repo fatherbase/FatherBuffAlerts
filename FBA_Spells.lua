@@ -1,5 +1,5 @@
 -- FatherBuffAlerts - Spellbook & Active Buff helpers (WoW 1.12)
--- Version: 2.1.6
+-- Version: 2.1.7
 
 -- get active buff entries: { {name=, texture=, active=true}, ... }
 local function GetBuffNameCompat(buff)

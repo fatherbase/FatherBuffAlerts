@@ -1,58 +1,72 @@
 -- FatherBuffAlerts - Settings UI + Minimap button (WoW 1.12 / Lua 5.0)
--- Version: 2.1.6
+-- Version: 2.1.7
 
 -- =======================
--- Minimap Button
+-- Minimap Button (standard ring style)
 -- =======================
--- Use a very safe Blizzard icon (Cat Form) to avoid '?' fallback on some 1.12 clients.
 local iconPathPrimary  = "Interface\\Icons\\Ability_Druid_CatForm"
 local iconPathFallback = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local btn = CreateFrame("Button", "FBA_MinimapButton", Minimap)
-btn:SetWidth(32); btn:SetHeight(32)
+btn:SetWidth(31); btn:SetHeight(31)
 btn:SetFrameStrata("HIGH")
 btn:SetFrameLevel(9)
 btn:RegisterForClicks("LeftButtonUp")
 btn:RegisterForDrag("LeftButton")
 btn:EnableMouse(true)
-btn:SetMovable(true)
+btn:SetMovable(false) -- we position via angle, not by moving
 btn:SetClampedToScreen(true)
 
-btn:ClearAllPoints()
-btn:SetPoint("CENTER", Minimap, "CENTER", 0, 0)
+-- highlight ring (default Blizzard)
+btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
--- Draw our own child icon so templates never hide it
+-- circular border overlay (gives the standard round look)
+local border = btn:CreateTexture(nil, "OVERLAY")
+border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+border:SetWidth(53); border:SetHeight(53)
+border:SetPoint("TOPLEFT", btn, "TOPLEFT", 0, 0)
+
+-- optional tracking background (dim circle behind icon)
+local back = btn:CreateTexture(nil, "BACKGROUND")
+back:SetTexture("Interface\\Minimap\\MiniMap-TrackingBackground")
+back:SetWidth(20); back:SetHeight(20)
+back:SetPoint("CENTER", btn, "CENTER", 0, 0)
+
+-- the actual icon
 local ic = btn:CreateTexture("FBA_MinimapButtonIcon", "ARTWORK")
-ic:SetAllPoints(btn)
+ic:SetWidth(20); ic:SetHeight(20)
+ic:SetPoint("CENTER", btn, "CENTER", 0, 0)
 ic:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 ic:SetTexture(iconPathPrimary)
--- keep a manual toggle so users never get stuck with '?'
 if not ic:GetTexture() or ic:GetTexture() == "" then ic:SetTexture(iconPathFallback) end
-
-btn:SetNormalTexture(nil)
-btn:SetPushedTexture(nil)
-btn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
-local ht = btn:GetHighlightTexture(); if ht then ht:SetAllPoints(btn) end
 
 btn:SetScript("OnClick", function()
   if FBA and FBA.UI_Show then FBA:UI_Show()
   else DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r UI not ready.") end
 end)
 
--- Vanilla uses global `this`
-btn:SetScript("OnDragStart", function() this:StartMoving() end)
-btn:SetScript("OnDragStop", function()
-  this:StopMovingOrSizing()
+-- Drag around the ring by updating angle each frame
+local function deg2rad(d) return d * math.pi / 180 end
+local function updateAngleFromCursor()
   if not (FBA and FBA.db and FBA.db.minimap) then return end
   local mx, my = Minimap:GetCenter()
-  local cx, cy = this:GetCenter()
-  local dx, dy = cx - mx, cy - my
-  local angle = math.deg(math.atan2(dy, dx)); if angle < 0 then angle = angle + 360 end
+  local px, py = GetCursorPosition()
+  local scale = Minimap:GetEffectiveScale()
+  local dx = (px / scale) - mx
+  local dy = (py / scale) - my
+  local angle = math.deg(math.atan2(dy, dx))
+  if angle < 0 then angle = angle + 360 end
   FBA.db.minimap.angle = math.floor(angle + 0.5)
-  if FBA.UI_PositionMinimapButton then FBA:UI_PositionMinimapButton() end
+  FBA:UI_PositionMinimapButton()
+end
+
+btn:SetScript("OnDragStart", function()
+  this:SetScript("OnUpdate", updateAngleFromCursor)
+end)
+btn:SetScript("OnDragStop", function()
+  this:SetScript("OnUpdate", nil)
 end)
 
-local function deg2rad(d) return d * math.pi / 180 end
 function FBA:UI_PositionMinimapButton()
   if not FBA.db or not FBA.db.minimap then return end
   local a = FBA.db.minimap.angle or 220
@@ -388,9 +402,11 @@ function FBA:UI_SwitchTab(which)
   FBA.UI_tab = which
   if which == "tracked" then
     listTitle:SetText("Tracked Buffs")
+    if FBA_BookFilter then FBA_BookFilter:Hide() end
     for i=1,visibleRows do trackedRows[i]:Show(); bookRows[i]:Hide() end
   else
     listTitle:SetText("Spellbook (actives first; click a spell, then + Add)")
+    if FBA_BookFilter then FBA_BookFilter:Show() end
     -- build book list with actives first
     FBA.UI_book = FBA:BuildBookList(nil)
     for i=1,visibleRows do trackedRows[i]:Hide(); bookRows[i]:Show() end
@@ -498,11 +514,6 @@ bookFilter:SetAutoFocus(false)
 bookFilter:Hide()
 bookFilter:SetScript("OnTextChanged", function() FBA:UI_Refresh() end)
 
--- show/hide filter with tab
-hooksecurefunc("FBA:UI_SwitchTab", function(which)
-  -- (hooksecurefunc isn’t really in 1.12, but leaving harmlessly—no effect if absent)
-end)
-
 function FBA:UI_RefreshDetail()
   local key = FBA.UI_selectedKey
   if key and FBA.db and FBA.db.spells[key] then
@@ -535,14 +546,6 @@ end
 
 function FBA:UI_Show()
   FBA_Config:Show()
-  -- toggle the filter visibility depending on tab
-  if (FBA.UI_tab or "tracked") == "book" then
-    listTitle:SetText("Spellbook (actives first; click a spell, then + Add)")
-    if FBA_BookFilter then FBA_BookFilter:Show() end
-  else
-    listTitle:SetText("Tracked Buffs")
-    if FBA_BookFilter then FBA_BookFilter:Hide() end
-  end
   FBA:UI_SwitchTab(FBA.UI_tab or "tracked")
 end
 function FBA:UI_Hide() FBA_Config:Hide() end
@@ -552,14 +555,4 @@ function FBA:UI_Init()
   FBA_EBDelay:SetScript("OnTextChanged", function()
     local key = FBA.UI_selectedKey
     if key and FBA.db and FBA.db.spells[key] then
-      local t = tonumber(FBA_EBDelay:GetText())
-      if t then
-        if t < 0 then t = 0 end
-        if t > 600 then t = 600 end
-        FBA.db.spells[key].threshold = t
-      end
-    end
-  end)
-  FBA:UI_SwitchTab("tracked")
-  FBA:UI_PositionMinimapButton()
-end
+      local t = to
