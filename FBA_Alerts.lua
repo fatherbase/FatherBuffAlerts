@@ -1,5 +1,7 @@
 -- FatherBuffAlerts - Alerts (splash UI)
+-- Version: 2.1.5
 
+-- main alert frame
 local alertFrame = CreateFrame("Frame", "FBA_AlertFrame", UIParent)
 alertFrame:SetWidth(900); alertFrame:SetHeight(90)
 alertFrame:Hide()
@@ -47,19 +49,19 @@ FBA.cdSimActive = false
 FBA.cdSimLabel  = nil
 FBA.cdSimTL     = 0
 
+local function Format1(s) if not s or s < 0 then s = 0 end return string.format("%.1f", s) end
+
 function FBA:ApplyAlertPosition()
   local pos = self.db.alertPos or {x=0,y=0}
-  alertFrame:ClearAllPoints()
-  alertFrame:SetPoint("CENTER", UIParent, "CENTER", pos.x or 0, pos.y or 0)
-  anchor:ClearAllPoints()
-  anchor:SetPoint("CENTER", UIParent, "CENTER", pos.x or 0, pos.y or 0)
+  FBA_AlertFrame:ClearAllPoints()
+  FBA_AlertFrame:SetPoint("CENTER", UIParent, "CENTER", pos.x or 0, pos.y or 0)
+  FBA_Anchor:ClearAllPoints()
+  FBA_Anchor:SetPoint("CENTER", UIParent, "CENTER", pos.x or 0, pos.y or 0)
 end
 
 function FBA:ShowAnchor(show)
-  if show then anchor:Show() else anchor:Hide() end
+  if show then FBA_Anchor:Show() else FBA_Anchor:Hide() end
 end
-
-local function Format1(s) if not s or s < 0 then s = 0 end return string.format("%.1f", s) end
 
 function FBA:ShowStatic(msg)
   if not self.db.showAlert then return end

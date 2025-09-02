@@ -1,14 +1,16 @@
 -- FatherBuffAlerts - Settings UI + Minimap button (WoW 1.12 / Lua 5.0)
+-- Version: 2.1.5
 
 -- =======================
 -- Minimap Button
 -- =======================
 local iconPath = "Interface\\Icons\\Ability_Druid_TigersFury"
+local fallbackIcon = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local btn = CreateFrame("Button", "FBA_MinimapButton", Minimap)
 btn:SetWidth(32); btn:SetHeight(32)
-btn:SetFrameStrata("MEDIUM")
-btn:SetFrameLevel(8)
+btn:SetFrameStrata("HIGH")
+btn:SetFrameLevel(9)
 btn:RegisterForClicks("LeftButtonUp")
 btn:RegisterForDrag("LeftButton")
 btn:EnableMouse(true)
@@ -18,18 +20,21 @@ btn:SetClampedToScreen(true)
 btn:ClearAllPoints()
 btn:SetPoint("CENTER", Minimap, "CENTER", 0, 0)
 
--- Use Normal/Pushed/Highlight textures so it always shows in 1.12
-btn:SetNormalTexture(iconPath)
-local nt = btn:GetNormalTexture(); if nt then nt:SetAllPoints(btn); nt:SetTexCoord(0.07,0.93,0.07,0.93) end
-btn:SetPushedTexture(iconPath)
-local pt = btn:GetPushedTexture(); if pt then pt:SetAllPoints(btn); pt:SetTexCoord(0.07,0.93,0.07,0.93) end
+-- Draw our own child icon so templates never hide it
+local ic = btn:CreateTexture("FBA_MinimapButtonIcon", "ARTWORK")
+ic:SetAllPoints(btn)
+ic:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+ic:SetTexture(iconPath)
+if not ic:GetTexture() then ic:SetTexture(fallbackIcon) end
+
+btn:SetNormalTexture(nil)
+btn:SetPushedTexture(nil)
 btn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
 local ht = btn:GetHighlightTexture(); if ht then ht:SetAllPoints(btn) end
 
 btn:SetScript("OnClick", function()
-  if FBA and FBA.UI_Show then FBA:UI_Show() else
-    DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r UI not ready.")
-  end
+  if FBA and FBA.UI_Show then FBA:UI_Show()
+  else DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r UI not ready.") end
 end)
 
 -- Vanilla uses global `this`
@@ -138,7 +143,7 @@ local listTitle = listBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 listTitle:SetPoint("TOPLEFT", listBG, "TOPLEFT", 8, -6)
 listTitle:SetText("Tracked Buffs")
 
--- Page indicator + Prev/Next buttons (works like scroll)
+-- Page indicator + Prev/Next (works like scroll)
 local pageText = listBG:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 pageText:SetPoint("BOTTOM", listBG, "BOTTOM", 0, 8)
 pageText:SetText("Page 1/1")
@@ -172,7 +177,7 @@ for i=1,visibleRows do
   local row = CreateFrame("Button", nil, listBG, "UIPanelButtonTemplate")
   row:SetWidth(280); row:SetHeight(22)
   row:SetPoint("TOPLEFT", listBG, "TOPLEFT", 18, -24 - (i-1)*26)
-  row._icon = row:CreateTexture(nil, "ARTWORK")
+  row._icon = row:CreateTexture(nil, "OVERLAY") -- ensure above button skin
   row._icon:SetWidth(18); row._icon:SetHeight(18)
   row._icon:SetPoint("LEFT", row, "LEFT", 6, 0)
   row._label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -219,12 +224,6 @@ addNextBtn:SetScript("OnClick", function()
   FBA.UI_waitNextCast = true
   DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Watching your next cast...")
 end)
-
-function FBA:UI_OnAddedFromCast(spellName)
-  if FBA_AddBox then FBA_AddBox:SetText(spellName or "") end
-  DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Tracked from cast: "..(spellName or "?"))
-  FBA:UI_Refresh()
-end
 
 -- Right detail panel
 local detBG = CreateFrame("Frame", nil, frame)
@@ -345,7 +344,7 @@ btnTest:SetScript("OnClick", function()
     end
     if FBA.db.showAlert then
       if FBA.db.alertCountdown then
-        FBA:StartCountdown(sp.name, sp.threshold or 4)
+        FBA:StartCountdownSim(sp.name, sp.threshold or 4)
       else
         local secs = math.floor((sp.threshold or 4) + 0.5)
         FBA:ShowStatic(sp.name.." expiring in "..secs.." seconds")

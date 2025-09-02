@@ -1,11 +1,11 @@
 -- FatherBuffAlerts (WoW 1.12 / Lua 5.0)
--- Core logic: per-character DB, multi-buff scanning, sounds, countdown splash hooks, slash commands.
--- Version: 2.1.4
+-- Core logic: DB, multi-buff scanning, sounds, countdown hooks, slash commands.
+-- Version: 2.1.5
 
 FBA = FBA or {}
 
 -- ---- Core state / constants
-FBA.version    = "2.1.4"
+FBA.version    = "2.1.5"
 FBA.timer      = FBA.timer or 0          -- ~10 Hz scan throttle
 FBA.EPSILON    = FBA.EPSILON or 0.15     -- small cushion for frame timing
 FBA.rt         = FBA.rt or {}            -- runtime flags per tracked buff key
@@ -19,7 +19,7 @@ local function Print(msg) DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAle
 local function InCombat() if UnitAffectingCombat then return UnitAffectingCombat("player") end return false end
 local function KeyFor(name) if not name then return "" end return string.lower(name) end
 
--- Tooltip fallback to read buff names (Vanilla)
+-- Tooltip fallback (Vanilla) to read buff names
 local tip = CreateFrame("GameTooltip", "FBA_Tooltip", UIParent, "GameTooltipTemplate")
 local function GetBuffNameCompat(buff)
   if GetPlayerBuffName then return GetPlayerBuffName(buff) end
@@ -34,11 +34,11 @@ end
 -- ---- Defaults / DB
 local function DefaultSpell(name)
   return {
-    name = name,            -- display label
-    enabled = true,         -- per-buff toggle
-    threshold = 4,          -- seconds before expiry
+    name = name,
+    enabled = true,
+    threshold = 4,
     sound = "default",      -- "default" | "none" | <path>
-    combatOnly = false,     -- only alert in combat
+    combatOnly = false,
     useLongReminder = true  -- if instance lasts >= 9m, also remind at 5m
   }
 end
@@ -49,30 +49,17 @@ local function IsDruid()
   return string.lower(class) == "druid"
 end
 
-local defaults = {
-  enabled = false,
-  showAlert = true,
-  alertCountdown = true,
-  alertPos = { x = 0, y = 120 },
-  spells = {},
-  minimap = { show = true, angle = 220 },
-  firstRunDone = false,
-  _migrated = false
-}
-
 function FBA:InitDB()
   if not FatherBuffAlertsDB then FatherBuffAlertsDB = {} end
   local db = FatherBuffAlertsDB
 
   if db.enabled == nil then db.enabled = IsDruid() and true or false end
-  if db.showAlert == nil then db.showAlert = defaults.showAlert end
-  if db.alertCountdown == nil then db.alertCountdown = defaults.alertCountdown end
-  if not db.alertPos then db.alertPos = { x = defaults.alertPos.x, y = defaults.alertPos.y } end
+  if db.showAlert == nil then db.showAlert = true end
+  if db.alertCountdown == nil then db.alertCountdown = true end
+  if not db.alertPos then db.alertPos = { x = 0, y = 120 } end
   if not db.spells then db.spells = {} end
   if not db.minimap then db.minimap = { show = true, angle = 220 } end
   if db.firstRunDone == nil then db.firstRunDone = false end
-
-  -- one-time migration: raw bell paths -> "default"
   if not db._migrated then
     for _, sp in pairs(db.spells) do
       if sp and sp.sound == DEFAULT_BELL then sp.sound = "default" end
@@ -110,12 +97,14 @@ local function CollectActiveBuffs()
 end
 
 function FBA:OnUpdate(elapsed)
-  if not self.db or not self.db.enabled then return end
   if not elapsed then elapsed = arg1 end
-  if not elapsed or elapsed <= 0 then return end
 
-  -- drive splash fade + test countdown from Alerts module
-  if self.AlertOnUpdate then self:AlertOnUpdate(elapsed) end
+  -- ALWAYS tick alert visuals (so /fba test fades/counts down even if addon disabled)
+  if self.AlertOnUpdate then self:AlertOnUpdate(elapsed or 0) end
+
+  -- stop here if not enabled for actual scanning
+  if not self.db or not self.db.enabled then return end
+  if not elapsed or elapsed <= 0 then return end
 
   self.timer = (self.timer or 0) + elapsed
   if self.timer < 0.10 then return end
@@ -131,10 +120,9 @@ function FBA:OnUpdate(elapsed)
       self.rt[key] = rt
 
       if a and a.tl then
-        -- remember the maximum TL seen for this instance (to detect long buffs)
         if (not rt.seenMaxTL) or (a.tl > rt.seenMaxTL) then rt.seenMaxTL = a.tl end
 
-        -- (A) 5-minute reminder for long buffs (no countdown)
+        -- 5m reminder for long instances (no countdown)
         if sp.useLongReminder and rt.seenMaxTL and rt.seenMaxTL >= 540 then
           if (not rt.longPlayed) and (a.tl <= 300 + self.EPSILON) and (a.tl > (sp.threshold or 4) + self.EPSILON) then
             if (not sp.combatOnly) or InCombat() then
@@ -146,21 +134,16 @@ function FBA:OnUpdate(elapsed)
             rt.longPlayed = true
           end
         else
-          -- if it's not a long instance, keep longPlayed false
           rt.longPlayed = false
         end
 
-        -- (B) Near-expiry alert at per-buff threshold (this one can use countdown)
+        -- per-buff threshold alert (can use countdown)
         local thr = sp.threshold or 4
-        if a.tl > (thr + self.EPSILON) then
-          rt.shortPlayed = false
-        end
+        if a.tl > (thr + self.EPSILON) then rt.shortPlayed = false end
 
         if a.tl <= (thr + self.EPSILON) then
           if (not soonestTL) or a.tl < soonestTL then
-            soonestTL = a.tl
-            soonestKey = key
-            soonestLabel = sp.name
+            soonestTL = a.tl; soonestKey = key; soonestLabel = sp.name
           end
         end
 
@@ -169,7 +152,7 @@ function FBA:OnUpdate(elapsed)
             PlayAlertSound(sp.sound)
             if self.db.showAlert then
               if self.db.alertCountdown and self.StartCountdown then
-                self:StartCountdown(sp.name, a.tl)  -- external (real) countdown; Core will keep updating it
+                self:StartCountdown(sp.name, a.tl)  -- real countdown (Core keeps updating)
                 self.activeKey = key
               else
                 local secs = math.floor(thr + 0.5)
@@ -182,15 +165,12 @@ function FBA:OnUpdate(elapsed)
         end
 
       else
-        -- buff not present; reset runtime for the next instance
-        rt.longPlayed = false
-        rt.shortPlayed = false
-        rt.seenMaxTL = nil
+        rt.longPlayed = false; rt.shortPlayed = false; rt.seenMaxTL = nil
       end
     end
   end
 
-  -- keep updating the live countdown text for the soonest buff (only near-expiry)
+  -- keep the live countdown text current for the nearest one
   if self.db.showAlert and self.db.alertCountdown and soonestKey and active[soonestKey] then
     local tl = active[soonestKey].tl or 0
     if self.UpdateCountdown then self:UpdateCountdown(soonestLabel, tl) end
@@ -432,7 +412,7 @@ SlashCmdList["FBA"] = function(msg)
     PlayAlertSound(cfg.sound)
     if FBA.db.showAlert then
       if FBA.db.alertCountdown and FBA.StartCountdownSim then
-        FBA:StartCountdownSim(cfg.name, cfg.threshold or 4) -- internal simulated countdown
+        FBA:StartCountdownSim(cfg.name, cfg.threshold or 4)
       elseif FBA.ShowStatic then
         local secs = math.floor((cfg.threshold or 4) + 0.5)
         FBA:ShowStatic(cfg.name.." expiring in "..secs.." seconds")

@@ -1,4 +1,5 @@
 -- FatherBuffAlerts - Spellbook helpers (WoW 1.12)
+-- Version: 2.1.5
 
 function FBA:GatherSpellbookEntries()
   local out, seen = {}, {}
@@ -11,7 +12,7 @@ function FBA:GatherSpellbookEntries()
         local nm = GetSpellName(idx, "spell")
         if nm and nm ~= "" and not seen[nm] then
           seen[nm] = true
-          local tx = GetSpellTexture and GetSpellTexture(idx, "spell") or "Interface\\Icons\\INV_Misc_QuestionMark"
+          local tx = (GetSpellTexture and GetSpellTexture(idx, "spell")) or "Interface\\Icons\\INV_Misc_QuestionMark"
           table.insert(out, { name = nm, texture = tx })
         end
       end
