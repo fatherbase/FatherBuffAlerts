@@ -1,5 +1,5 @@
 -- FatherBuffAlerts - Settings UI + Minimap button (WoW 1.12 / Lua 5.0)
--- Version: 2.1.10 (UI layout fix)
+-- Version: 2.1.10 (UI layout fix 2)
 
 -- =======================
 -- Minimap Button (standard ring style)
@@ -70,7 +70,8 @@ function FBA:UI_PositionMinimapButton()
 end
 
 -- =======================
--- Settings Window (Buff Settings strip under toggles; Spellbook left; Tracked right; Controls top-right)
+-- Settings Window (Quick Add top-right; Buff Settings left under toggles;
+--                  Spellbook left; Tracked right; page labels bottom-centered)
 -- =======================
 local frame = CreateFrame("Frame", "FBA_Config", UIParent)
 frame:SetWidth(880); frame:SetHeight(600)
@@ -94,7 +95,7 @@ title:SetText("FatherBuffAlerts — Settings")
 local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -5, -5)
 
--- Global toggles (top)
+-- Global toggles (top-left)
 local cbEnabled = CreateFrame("CheckButton", "FBA_CBEnabled", frame, "UICheckButtonTemplate")
 cbEnabled:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -48)
 FBA_CBEnabledText:SetText("Enabled")
@@ -125,9 +126,57 @@ cbMinimap:SetScript("OnClick", function()
   end
 end)
 
--- ===== Buff Settings STRIP (left, under toggles; no overlap)
+-- ===== Quick Add PANEL (TOP-RIGHT, above Buff Settings; anchored to right)
+local ctrlBG = CreateFrame("Frame", nil, frame)
+ctrlBG:SetWidth(240); ctrlBG:SetHeight(100)
+ctrlBG:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -20, -48) -- keep at top-right
+ctrlBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+                     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+                     tile = true, tileSize = 16, edgeSize = 12,
+                     insets = { left=3, right=3, top=3, bottom=3 } })
+ctrlBG:SetBackdropColor(0,0,0,0.5)
+
+local ctrlTitle = ctrlBG:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+ctrlTitle:SetPoint("TOPLEFT", ctrlBG, "TOPLEFT", 8, -8)
+ctrlTitle:SetText("Quick Add")
+
+local addBox = CreateFrame("EditBox", "FBA_AddBox", ctrlBG, "InputBoxTemplate")
+addBox:SetWidth(212); addBox:SetHeight(20)
+addBox:SetPoint("TOPLEFT", ctrlBG, "TOPLEFT", 12, -34)
+addBox:SetAutoFocus(false)
+
+local addBtn = CreateFrame("Button", nil, ctrlBG, "UIPanelButtonTemplate")
+addBtn:SetWidth(110); addBtn:SetHeight(22)
+addBtn:SetPoint("TOPLEFT", addBox, "BOTTOMLEFT", 0, -8)
+addBtn:SetText("Add by name")
+addBtn:SetScript("OnClick", function()
+  local nm = FBA_AddBox:GetText()
+  if nm and nm ~= "" and FBA and FBA.db then
+    local key = string.lower(nm)
+    if not FBA.db.spells[key] then
+      FBA.db.spells[key] = { name = nm, enabled = true, threshold = 4, sound = "default",
+                             combatOnly=false, useLongReminder=true, showCountdown=true, showSplash=true }
+      FBA_AddBox:SetText("")
+      FBA:UI_Refresh()
+      DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Added '"..nm.."'")
+    else
+      DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Already tracking '"..nm.."'")
+    end
+  end
+end)
+
+local addNextBtn = CreateFrame("Button", nil, ctrlBG, "UIPanelButtonTemplate")
+addNextBtn:SetWidth(110); addNextBtn:SetHeight(22)
+addNextBtn:SetPoint("LEFT", addBtn, "RIGHT", 6, 0) -- fully inside ctrl panel
+addNextBtn:SetText("Add Next Cast")
+addNextBtn:SetScript("OnClick", function()
+  FBA.UI_waitNextCast = true
+  DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Watching your next cast; the next spell you cast will be added to Tracked automatically.")
+end)
+
+-- ===== Buff Settings STRIP (LEFT, under toggles; widened & with Sound on its own row)
 local detBG = CreateFrame("Frame", nil, frame)
-detBG:SetWidth(600); detBG:SetHeight(126)      -- narrower to leave room for the Controls panel
+detBG:SetWidth(600); detBG:SetHeight(150)      -- taller to fit the Sound row cleanly
 detBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -150)
 detBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -208,8 +257,9 @@ ebDelay:SetPoint("LEFT", lblDelay, "RIGHT", 6, 0)
 ebDelay:SetAutoFocus(false)
 ebDelay:SetScript("OnEnterPressed", function() this:ClearFocus() end)
 
+-- Move SOUND onto its own row so it never clips outside
 local lblSound = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lblSound:SetPoint("LEFT", FBA_EBDelay, "RIGHT", 16, 0)
+lblSound:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -114)
 lblSound:SetText("Sound:")
 
 local ddSound = CreateFrame("Button", "FBA_DDSound", detBG, "UIPanelButtonTemplate")
@@ -217,6 +267,13 @@ ddSound:SetWidth(100); ddSound:SetHeight(20)
 ddSound:SetPoint("LEFT", lblSound, "RIGHT", 6, 0)
 ddSound._mode = "default"
 ddSound:SetText("default")
+
+local ebSound = CreateFrame("EditBox", "FBA_EBSoundPath", detBG, "InputBoxTemplate")
+ebSound:SetWidth(180); ebSound:SetHeight(20)  -- narrower to fit within panel
+ebSound:SetPoint("LEFT", ddSound, "RIGHT", 6, 0)
+ebSound:SetAutoFocus(false)
+ebSound:Hide()
+
 ddSound:SetScript("OnClick", function()
   local m = FBA_DDSound._mode
   if m == "default" then m = "none"
@@ -236,11 +293,6 @@ ddSound:SetScript("OnClick", function()
   end
 end)
 
-local ebSound = CreateFrame("EditBox", "FBA_EBSoundPath", detBG, "InputBoxTemplate")
-ebSound:SetWidth(220); ebSound:SetHeight(20)
-ebSound:SetPoint("LEFT", ddSound, "RIGHT", 6, 0)
-ebSound:SetAutoFocus(false)
-ebSound:Hide()
 ebSound:SetScript("OnTextChanged", function()
   local key = FBA.UI_selectedKey
   if key and FBA.db and FBA.db.spells[key] and FBA_DDSound._mode == "custom" then
@@ -249,59 +301,11 @@ ebSound:SetScript("OnTextChanged", function()
   end
 end)
 
--- ===== Controls PANEL (top-right) — Add by name / Add Next Cast
-local ctrlBG = CreateFrame("Frame", nil, frame)
-ctrlBG:SetWidth(220); ctrlBG:SetHeight(90)
-ctrlBG:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -20, -150)
-ctrlBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-                     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-                     tile = true, tileSize = 16, edgeSize = 12,
-                     insets = { left=3, right=3, top=3, bottom=3 } })
-ctrlBG:SetBackdropColor(0,0,0,0.5)
-
-local ctrlTitle = ctrlBG:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-ctrlTitle:SetPoint("TOPLEFT", ctrlBG, "TOPLEFT", 8, -8)
-ctrlTitle:SetText("Quick Add")
-
-local addBox = CreateFrame("EditBox", "FBA_AddBox", ctrlBG, "InputBoxTemplate")
-addBox:SetWidth(196); addBox:SetHeight(20)
-addBox:SetPoint("TOPLEFT", ctrlBG, "TOPLEFT", 12, -32)
-addBox:SetAutoFocus(false)
-
-local addBtn = CreateFrame("Button", nil, ctrlBG, "UIPanelButtonTemplate")
-addBtn:SetWidth(96); addBtn:SetHeight(20)
-addBtn:SetPoint("TOPLEFT", addBox, "BOTTOMLEFT", 0, -6)
-addBtn:SetText("Add by name")
-addBtn:SetScript("OnClick", function()
-  local nm = FBA_AddBox:GetText()
-  if nm and nm ~= "" and FBA and FBA.db then
-    local key = string.lower(nm)
-    if not FBA.db.spells[key] then
-      FBA.db.spells[key] = { name = nm, enabled = true, threshold = 4, sound = "default",
-                             combatOnly=false, useLongReminder=true, showCountdown=true, showSplash=true }
-      FBA_AddBox:SetText("")
-      FBA:UI_Refresh()
-      DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Added '"..nm.."'")
-    else
-      DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Already tracking '"..nm.."'")
-    end
-  end
-end)
-
-local addNextBtn = CreateFrame("Button", nil, ctrlBG, "UIPanelButtonTemplate")
-addNextBtn:SetWidth(110); addNextBtn:SetHeight(20)
-addNextBtn:SetPoint("LEFT", addBtn, "RIGHT", 6, 0)
-addNextBtn:SetText("Add Next Cast")
-addNextBtn:SetScript("OnClick", function()
-  FBA.UI_waitNextCast = true
-  DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Watching your next cast; the next spell you cast will be added to Tracked automatically.")
-end)
-
 -- ===== Lists (Spellbook left + Tracked right) — fully inside main window
 -- Panels sized/placed to avoid overflow (600 height window)
 local bookBG = CreateFrame("Frame", nil, frame)
 bookBG:SetWidth(380); bookBG:SetHeight(300)
-bookBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -290)   -- -290 + 300 =  -?  stays within 600
+bookBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -310)   -- slightly lower to leave room above
 bookBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                      edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
                      tile = true, tileSize = 16, edgeSize = 12,
@@ -313,21 +317,6 @@ local bookTitle = bookBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 bookTitle:SetPoint("TOPLEFT", bookBG, "TOPLEFT", 8, -6)
 bookTitle:SetText("Spellbook (actives first) — click to add")
 
--- Page label INSIDE top-right of spellbook
-local bookPageText = bookBG:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-bookPageText:SetPoint("TOPRIGHT", bookBG, "TOPRIGHT", -8, -8)
-bookPageText:SetText("Page 1/1")
-
-local bookPrev = CreateFrame("Button", nil, bookBG, "UIPanelButtonTemplate")
-bookPrev:SetWidth(22); bookPrev:SetHeight(20)
-bookPrev:SetPoint("RIGHT", bookPageText, "LEFT", -4, 0)
-bookPrev:SetText("<")
-
-local bookNext = CreateFrame("Button", nil, bookBG, "UIPanelButtonTemplate")
-bookNext:SetWidth(22); bookNext:SetHeight(20)
-bookNext:SetPoint("LEFT", bookPageText, "RIGHT", 4, 0)
-bookNext:SetText(">")
-
 -- Filter box INSIDE spellbook, below title
 local bookFilter = CreateFrame("EditBox", "FBA_BookFilter", bookBG, "InputBoxTemplate")
 bookFilter:SetWidth(340); bookFilter:SetHeight(20)
@@ -336,10 +325,25 @@ bookFilter:SetAutoFocus(false)
 bookFilter:SetText("")
 bookFilter:SetScript("OnTextChanged", function() FBA:UI_Refresh() end)
 
+-- Page label INSIDE bottom center of spellbook
+local bookPageText = bookBG:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+bookPageText:SetPoint("BOTTOM", bookBG, "BOTTOM", 0, 8)
+bookPageText:SetText("Page 1/1")
+
+local bookPrev = CreateFrame("Button", nil, bookBG, "UIPanelButtonTemplate")
+bookPrev:SetWidth(22); bookPrev:SetHeight(20)
+bookPrev:SetPoint("RIGHT", bookPageText, "LEFT", -6, 0)
+bookPrev:SetText("<")
+
+local bookNext = CreateFrame("Button", nil, bookBG, "UIPanelButtonTemplate")
+bookNext:SetWidth(22); bookNext:SetHeight(20)
+bookNext:SetPoint("LEFT", bookPageText, "RIGHT", 6, 0)
+bookNext:SetText(">")
+
 -- Tracked panel
 local trackedBG = CreateFrame("Frame", nil, frame)
 trackedBG:SetWidth(380); trackedBG:SetHeight(300)
-trackedBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 480, -290)
+trackedBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 480, -310)
 trackedBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
                         tile = true, tileSize = 16, edgeSize = 12,
@@ -351,23 +355,25 @@ local trackedTitle = trackedBG:CreateFontString(nil, "OVERLAY", "GameFontNormal"
 trackedTitle:SetPoint("TOPLEFT", trackedBG, "TOPLEFT", 8, -6)
 trackedTitle:SetText("Tracked Buffs")
 
--- Page label INSIDE top-right of tracked panel
+-- Page label INSIDE bottom center of tracked panel
 local trackedPageText = trackedBG:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-trackedPageText:SetPoint("TOPRIGHT", trackedBG, "TOPRIGHT", -8, -8)
+trackedPageText:SetPoint("BOTTOM", trackedBG, "BOTTOM", 0, 8)
 trackedPageText:SetText("Page 1/1")
 
 local trackedPrev = CreateFrame("Button", nil, trackedBG, "UIPanelButtonTemplate")
 trackedPrev:SetWidth(22); trackedPrev:SetHeight(20)
-trackedPrev:SetPoint("RIGHT", trackedPageText, "LEFT", -4, 0)
+trackedPrev:SetPoint("RIGHT", trackedPageText, "LEFT", -6, 0)
 trackedPrev:SetText("<")
 
 local trackedNext = CreateFrame("Button", nil, trackedBG, "UIPanelButtonTemplate")
 trackedNext:SetWidth(22); trackedNext:SetHeight(20)
-trackedNext:SetPoint("LEFT", trackedPageText, "RIGHT", 4, 0)
+trackedNext:SetPoint("LEFT", trackedPageText, "RIGHT", 6, 0)
 trackedNext:SetText(">")
 
 -- Rows (adjusted to fit inside 300px height panels)
-local visibleRows = 9  -- 56 + 26*9 = 290 < 300 (fits)
+-- Top margin ~56 (title+filter), bottom margin ~28 (page controls)
+-- Available ~216px => 8 rows at 26px fits
+local visibleRows = 8
 local bookRows, trackedRows = {}, {}
 
 local function makeIconRow(parent)
@@ -402,7 +408,7 @@ end
 
 for i=1,visibleRows do
   local r = makeIconRow(trackedBG)
-  r:SetPoint("TOPLEFT", trackedBG, "TOPLEFT", 18, -56 - (i-1)*26) -- room for title/page
+  r:SetPoint("TOPLEFT", trackedBG, "TOPLEFT", 18, -40 - (i-1)*26) -- title-only top margin
   r:SetScript("OnClick", function() FBA.UI_selectedKey = r._key; FBA:UI_RefreshDetail() end)
   r:Hide(); trackedRows[i] = r
 end
