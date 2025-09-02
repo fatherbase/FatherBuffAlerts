@@ -555,4 +555,14 @@ function FBA:UI_Init()
   FBA_EBDelay:SetScript("OnTextChanged", function()
     local key = FBA.UI_selectedKey
     if key and FBA.db and FBA.db.spells[key] then
-      local t = to
+      local t = tonumber(FBA_EBDelay:GetText())
+      if t then
+        if t < 0 then t = 0 end
+        if t > 600 then t = 600 end
+        FBA.db.spells[key].threshold = t
+      end
+    end
+  end)
+  FBA:UI_SwitchTab("tracked")
+  FBA:UI_PositionMinimapButton()
+end
