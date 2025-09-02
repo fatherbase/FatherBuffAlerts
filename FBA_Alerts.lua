@@ -1,5 +1,5 @@
 -- FatherBuffAlerts - Alerts (splash UI)
--- Version: 2.1.7
+-- Version: 2.1.8
 
 -- main alert frame
 local alertFrame = CreateFrame("Frame", "FBA_AlertFrame", UIParent)
@@ -44,12 +44,38 @@ FBA.alertTimer = 0
 FBA.alertHold = 1.2
 FBA.alertFade = 1.0
 
+-- countdown stepping
+FBA.cdStep = 0.1           -- 0.1 (≤10s), 1 (>10s), 10 (>30s)
+FBA.cdLastBucket = nil     -- last displayed bucket value
+
 -- countdown simulator (used by /fba test when countdown enabled)
 FBA.cdSimActive = false
 FBA.cdSimLabel  = nil
 FBA.cdSimTL     = 0
 
-local function Format1(s) if not s or s < 0 then s = 0 end return string.format("%.1f", s) end
+local function FormatNum(step, v)
+  if step >= 10 then
+    return tostring(math.floor(v + 0.5))
+  elseif step >= 1 then
+    return tostring(math.floor(v + 0.0001))
+  else
+    return string.format("%.1f", v)
+  end
+end
+
+local function quantize(step, tl)
+  if step <= 0.11 then
+    return math.floor(tl*10+0.0001)/10
+  else
+    return math.floor(tl/step) * step
+  end
+end
+
+function FBA:SetCountdownStep(step)
+  if not step or step <= 0 then step = 0.1 end
+  self.cdStep = step
+  self.cdLastBucket = nil
+end
 
 function FBA:ApplyAlertPosition()
   local pos = self.db.alertPos or {x=0,y=0}
@@ -63,7 +89,8 @@ function FBA:ShowAnchor(show)
   if show then FBA_Anchor:Show() else FBA_Anchor:Hide() end
 end
 
-function FBA:ShowStatic(msg)
+-- optional totalDur (seconds) to make the static alert disappear within that time
+function FBA:ShowStatic(msg, totalDur)
   if not self.db.showAlert then return end
   text:SetText(msg or "")
   FBA_AlertFrame:SetAlpha(1)
@@ -72,13 +99,25 @@ function FBA:ShowStatic(msg)
   self.alertModeCountdown = false
   self.alertTimer = 0
   self.cdSimActive = false
+  if totalDur and totalDur > 0 then
+    local hold = math.max(0.8, totalDur - 1.5)
+    local fade = totalDur - hold
+    if fade < 0.5 then fade = 0.5 end
+    self.alertHold = hold
+    self.alertFade = fade
+  else
+    self.alertHold = 1.2
+    self.alertFade = 1.0
+  end
 end
 
 function FBA:StartCountdown(label, tl)
   if not self.db.showAlert then return end
   self.cdSimActive = false  -- external updates from Core
+  self.cdLastBucket = nil
   local lbl = label or "Buff"
-  text:SetText(lbl.." expiring in "..Format1(tl).."s")
+  local b = quantize(self.cdStep, tl or 0)
+  text:SetText(lbl.." expiring in "..FormatNum(self.cdStep, b).."s")
   FBA_AlertFrame:SetAlpha(1)
   FBA_AlertFrame:Show()
   self.alertActive = true
@@ -92,7 +131,9 @@ function FBA:StartCountdownSim(label, seconds)
   self.cdSimLabel = label or "Buff"
   self.cdSimTL = tonumber(seconds) or 4
   if self.cdSimTL < 0 then self.cdSimTL = 0 end
-  text:SetText(self.cdSimLabel.." expiring in "..Format1(self.cdSimTL).."s")
+  self.cdLastBucket = nil
+  local b = quantize(self.cdStep, self.cdSimTL)
+  text:SetText(self.cdSimLabel.." expiring in "..FormatNum(self.cdStep, b).."s")
   FBA_AlertFrame:SetAlpha(1)
   FBA_AlertFrame:Show()
   self.alertActive = true
@@ -104,7 +145,11 @@ function FBA:UpdateCountdown(label, tl)
   self.cdSimActive = false
   if not self.alertModeCountdown then return end
   local lbl = label or "Buff"
-  text:SetText(lbl.." expiring in "..Format1(tl).."s")
+  local b = quantize(self.cdStep, tl or 0)
+  if self.cdLastBucket == nil or b ~= self.cdLastBucket then
+    text:SetText(lbl.." expiring in "..FormatNum(self.cdStep, b).."s")
+    self.cdLastBucket = b
+  end
 end
 
 function FBA:HideAlert()
@@ -113,6 +158,7 @@ function FBA:HideAlert()
   self.alertModeCountdown = false
   self.alertTimer = 0
   self.cdSimActive = false
+  self.cdLastBucket = nil
 end
 
 function FBA:AlertOnUpdate(elapsed)
@@ -124,13 +170,11 @@ function FBA:AlertOnUpdate(elapsed)
         self:HideAlert()
       else
         local lbl = self.cdSimLabel or "Buff"
-        local tl  = self.cdSimTL
-        local s = string.format("%.1f", (tl < 0 and 0) or tl)
-        _G["FBA_AlertFrame"]:Show()
-        _G["FBA_AlertFrame"]:SetAlpha(1)
-        _G["FBA_Anchor"]:Hide()
-        _G["FBA_AlertFrame"]:SetAlpha(1)
-        text:SetText(lbl.." expiring in "..s.."s")
+        local b = quantize(self.cdStep, self.cdSimTL)
+        if self.cdLastBucket == nil or b ~= self.cdLastBucket then
+          text:SetText(lbl.." expiring in "..FormatNum(self.cdStep, b).."s")
+          self.cdLastBucket = b
+        end
       end
     end
     return

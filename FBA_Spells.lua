@@ -1,5 +1,7 @@
 -- FatherBuffAlerts - Spellbook & Active Buff helpers (WoW 1.12)
--- Version: 2.1.7
+-- Version: 2.1.8
+
+FBA.iconCache = FBA.iconCache or {}
 
 -- get active buff entries: { {name=, texture=, active=true}, ... }
 local function GetBuffNameCompat(buff)
@@ -23,12 +25,38 @@ local function GatherActiveBuffEntries()
     if nm and nm ~= "" and not seen[nm] then
       seen[nm] = true
       local tx = (GetPlayerBuffTexture and GetPlayerBuffTexture(buff)) or "Interface\\Icons\\INV_Misc_QuestionMark"
+      FBA.iconCache[string.lower(nm)] = tx
       table.insert(out, { name = nm, texture = tx, active = true })
     end
     i = i + 1
   end
   table.sort(out, function(a,b) return string.lower(a.name) < string.lower(b.name) end)
   return out, seen
+end
+
+function FBA:GetSpellTextureByName(name)
+  if not name or name == "" then return "Interface\\Icons\\INV_Misc_QuestionMark" end
+  local key = string.lower(name)
+  if self.iconCache[key] then return self.iconCache[key] end
+
+  if not (GetNumSpellTabs and GetSpellTabInfo and GetSpellName) then
+    return "Interface\\Icons\\INV_Misc_QuestionMark"
+  end
+  for t = 1, GetNumSpellTabs() do
+    local _, _, offset, numSpells = GetSpellTabInfo(t)
+    if offset and numSpells then
+      for s = 1, numSpells do
+        local idx = offset + s
+        local nm = GetSpellName(idx, "spell")
+        if nm == name then
+          local tx = (GetSpellTexture and GetSpellTexture(idx, "spell")) or "Interface\\Icons\\INV_Misc_QuestionMark"
+          self.iconCache[key] = tx
+          return tx
+        end
+      end
+    end
+  end
+  return "Interface\\Icons\\INV_Misc_QuestionMark"
 end
 
 function FBA:GatherSpellbookEntries()
@@ -43,6 +71,7 @@ function FBA:GatherSpellbookEntries()
         if nm and nm ~= "" and not seen[nm] then
           seen[nm] = true
           local tx = (GetSpellTexture and GetSpellTexture(idx, "spell")) or "Interface\\Icons\\INV_Misc_QuestionMark"
+          FBA.iconCache[string.lower(nm)] = tx
           table.insert(out, { name = nm, texture = tx })
         end
       end
@@ -102,5 +131,5 @@ function FBA:SuggestSpellbook(filterLower)
     end
   end
   if shown == 0 then DEFAULT_CHAT_FRAME:AddMessage("  (no matches)") end
-  DEFAULT_CHAT_FRAME:AddMessage("Tip: /fba add #<n> to add a name from this list.")
+  DEFAULT_CHAT_FRAME:AddMessage("Tip: Click a spell in the left panel to add it.")
 end

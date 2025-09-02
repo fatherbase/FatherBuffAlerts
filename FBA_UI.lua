@@ -1,5 +1,5 @@
 -- FatherBuffAlerts - Settings UI + Minimap button (WoW 1.12 / Lua 5.0)
--- Version: 2.1.7
+-- Version: 2.1.8
 
 -- =======================
 -- Minimap Button (standard ring style)
@@ -17,22 +17,18 @@ btn:EnableMouse(true)
 btn:SetMovable(false) -- we position via angle, not by moving
 btn:SetClampedToScreen(true)
 
--- highlight ring (default Blizzard)
 btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
--- circular border overlay (gives the standard round look)
 local border = btn:CreateTexture(nil, "OVERLAY")
 border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
 border:SetWidth(53); border:SetHeight(53)
 border:SetPoint("TOPLEFT", btn, "TOPLEFT", 0, 0)
 
--- optional tracking background (dim circle behind icon)
 local back = btn:CreateTexture(nil, "BACKGROUND")
 back:SetTexture("Interface\\Minimap\\MiniMap-TrackingBackground")
 back:SetWidth(20); back:SetHeight(20)
 back:SetPoint("CENTER", btn, "CENTER", 0, 0)
 
--- the actual icon
 local ic = btn:CreateTexture("FBA_MinimapButtonIcon", "ARTWORK")
 ic:SetWidth(20); ic:SetHeight(20)
 ic:SetPoint("CENTER", btn, "CENTER", 0, 0)
@@ -45,7 +41,6 @@ btn:SetScript("OnClick", function()
   else DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r UI not ready.") end
 end)
 
--- Drag around the ring by updating angle each frame
 local function deg2rad(d) return d * math.pi / 180 end
 local function updateAngleFromCursor()
   if not (FBA and FBA.db and FBA.db.minimap) then return end
@@ -60,12 +55,8 @@ local function updateAngleFromCursor()
   FBA:UI_PositionMinimapButton()
 end
 
-btn:SetScript("OnDragStart", function()
-  this:SetScript("OnUpdate", updateAngleFromCursor)
-end)
-btn:SetScript("OnDragStop", function()
-  this:SetScript("OnUpdate", nil)
-end)
+btn:SetScript("OnDragStart", function() this:SetScript("OnUpdate", updateAngleFromCursor) end)
+btn:SetScript("OnDragStop",  function() this:SetScript("OnUpdate", nil) end)
 
 function FBA:UI_PositionMinimapButton()
   if not FBA.db or not FBA.db.minimap then return end
@@ -79,10 +70,10 @@ function FBA:UI_PositionMinimapButton()
 end
 
 -- =======================
--- Settings Window
+-- Settings Window (Spellbook left, Tracked right)
 -- =======================
 local frame = CreateFrame("Frame", "FBA_Config", UIParent)
-frame:SetWidth(760); frame:SetHeight(540)
+frame:SetWidth(880); frame:SetHeight(600)
 frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 frame:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
                     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
@@ -95,7 +86,6 @@ frame:RegisterForDrag("LeftButton")
 frame:SetScript("OnDragStart", function() this:StartMoving() end)
 frame:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
 
--- ESC close support
 tinsert(UISpecialFrames, "FBA_Config")
 
 local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
@@ -105,10 +95,10 @@ title:SetText("FatherBuffAlerts — Settings")
 local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -5, -5)
 
--- Global toggles
+-- Global toggles (top)
 local cbEnabled = CreateFrame("CheckButton", "FBA_CBEnabled", frame, "UICheckButtonTemplate")
 cbEnabled:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -48)
-FBA_CBEnabledText:SetText("Enabled (per-character)")
+FBA_CBEnabledText:SetText("Enabled")
 cbEnabled:SetScript("OnClick", function() if FBA and FBA.db then FBA.db.enabled = FBA_CBEnabled:GetChecked() end end)
 
 local cbSplash = CreateFrame("CheckButton", "FBA_CBSplash", frame, "UICheckButtonTemplate")
@@ -118,7 +108,7 @@ cbSplash:SetScript("OnClick", function() if FBA and FBA.db then FBA.db.showAlert
 
 local cbCountdown = CreateFrame("CheckButton", "FBA_CBCountdown", frame, "UICheckButtonTemplate")
 cbCountdown:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -96)
-FBA_CBCountdownText:SetText("Show live countdown text")
+FBA_CBCountdownText:SetText("Enable live countdown (global)")
 cbCountdown:SetScript("OnClick", function()
   if FBA and FBA.db then
     FBA.db.alertCountdown = FBA_CBCountdown:GetChecked()
@@ -136,94 +126,126 @@ cbMinimap:SetScript("OnClick", function()
   end
 end)
 
--- Tabs
-local tabTracked = CreateFrame("Button", "FBA_TabTracked", frame, "UIPanelButtonTemplate")
-tabTracked:SetWidth(100); tabTracked:SetHeight(22)
-tabTracked:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -150)
-tabTracked:SetText("Tracked")
-
-local tabBook = CreateFrame("Button", "FBA_TabBook", frame, "UIPanelButtonTemplate")
-tabBook:SetWidth(100); tabBook:SetHeight(22)
-tabBook:SetPoint("LEFT", tabTracked, "RIGHT", 8, 0)
-tabBook:SetText("Spellbook")
-
--- Left list container (reused by both tabs)
-local listBG = CreateFrame("Frame", nil, frame)
-listBG:SetWidth(340); listBG:SetHeight(320)
-listBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -180)
-listBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+-- Left: Spellbook panel
+local bookBG = CreateFrame("Frame", nil, frame)
+bookBG:SetWidth(380); bookBG:SetHeight(390)
+bookBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -160)
+bookBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                      edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
                      tile = true, tileSize = 16, edgeSize = 12,
                      insets = { left=3, right=3, top=3, bottom=3 } })
-listBG:SetBackdropColor(0,0,0,0.5)
-listBG:EnableMouseWheel(1)
+bookBG:SetBackdropColor(0,0,0,0.5)
+bookBG:EnableMouseWheel(1)
 
-local listTitle = listBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-listTitle:SetPoint("TOPLEFT", listBG, "TOPLEFT", 8, -6)
-listTitle:SetText("Tracked Buffs")
+local bookTitle = bookBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+bookTitle:SetPoint("TOPLEFT", bookBG, "TOPLEFT", 8, -6)
+bookTitle:SetText("Spellbook (actives first) — click to add")
 
--- Page indicator + Prev/Next (works like scroll)
-local pageText = listBG:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-pageText:SetPoint("BOTTOM", listBG, "BOTTOM", 0, 8)
-pageText:SetText("Page 1/1")
+local bookPageText = bookBG:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+bookPageText:SetPoint("BOTTOM", bookBG, "BOTTOM", 0, 8)
+bookPageText:SetText("Page 1/1")
 
-local btnPrev = CreateFrame("Button", nil, listBG, "UIPanelButtonTemplate")
-btnPrev:SetWidth(28); btnPrev:SetHeight(20)
-btnPrev:SetPoint("RIGHT", pageText, "LEFT", -6, 0)
-btnPrev:SetText("<")
+local bookPrev = CreateFrame("Button", nil, bookBG, "UIPanelButtonTemplate")
+bookPrev:SetWidth(28); bookPrev:SetHeight(20)
+bookPrev:SetPoint("RIGHT", bookPageText, "LEFT", -6, 0)
+bookPrev:SetText("<")
 
-local btnNext = CreateFrame("Button", nil, listBG, "UIPanelButtonTemplate")
-btnNext:SetWidth(28); btnNext:SetHeight(20)
-btnNext:SetPoint("LEFT", pageText, "RIGHT", 6, 0)
-btnNext:SetText(">")
+local bookNext = CreateFrame("Button", nil, bookBG, "UIPanelButtonTemplate")
+bookNext:SetWidth(28); bookNext:SetHeight(20)
+bookNext:SetPoint("LEFT", bookPageText, "RIGHT", 6, 0)
+bookNext:SetText(">")
 
--- Rows with optional icon
+local bookFilter = CreateFrame("EditBox", "FBA_BookFilter", frame, "InputBoxTemplate")
+bookFilter:SetWidth(360); bookFilter:SetHeight(20)
+bookFilter:SetPoint("TOPLEFT", frame, "TOPLEFT", 30, -560)
+bookFilter:SetAutoFocus(false)
+bookFilter:SetScript("OnTextChanged", function() FBA:UI_Refresh() end)
+
+-- Right: Tracked panel
+local trackedBG = CreateFrame("Frame", nil, frame)
+trackedBG:SetWidth(380); trackedBG:SetHeight(390)
+trackedBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 480, -160)
+trackedBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+                        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+                        tile = true, tileSize = 16, edgeSize = 12,
+                        insets = { left=3, right=3, top=3, bottom=3 } })
+trackedBG:SetBackdropColor(0,0,0,0.5)
+trackedBG:EnableMouseWheel(1)
+
+local trackedTitle = trackedBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+trackedTitle:SetPoint("TOPLEFT", trackedBG, "TOPLEFT", 8, -6)
+trackedTitle:SetText("Tracked Buffs")
+
+local trackedPageText = trackedBG:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+trackedPageText:SetPoint("BOTTOM", trackedBG, "BOTTOM", 0, 8)
+trackedPageText:SetText("Page 1/1")
+
+local trackedPrev = CreateFrame("Button", nil, trackedBG, "UIPanelButtonTemplate")
+trackedPrev:SetWidth(28); trackedPrev:SetHeight(20)
+trackedPrev:SetPoint("RIGHT", trackedPageText, "LEFT", -6, 0)
+trackedPrev:SetText("<")
+
+local trackedNext = CreateFrame("Button", nil, trackedBG, "UIPanelButtonTemplate")
+trackedNext:SetWidth(28); trackedNext:SetHeight(20)
+trackedNext:SetPoint("LEFT", trackedPageText, "RIGHT", 6, 0)
+trackedNext:SetText(">")
+
+-- Rows
 local visibleRows = 11
-local trackedRows, bookRows = {}, {}
+local bookRows, trackedRows = {}, {}
 
--- tracked rows (text only)
-for i=1,visibleRows do
-  local b = CreateFrame("Button", nil, listBG, "UIPanelButtonTemplate")
-  b:SetWidth(300); b:SetHeight(22)
-  b:SetPoint("TOPLEFT", listBG, "TOPLEFT", 18, -24 - (i-1)*26)
-  b:SetText("")
-  b:SetScript("OnClick", function() FBA.UI_selectedKey = b._key; FBA:UI_RefreshDetail() end)
-  trackedRows[i] = b
-end
-
--- spellbook rows (icon + name)
-for i=1,visibleRows do
-  local row = CreateFrame("Button", nil, listBG, "UIPanelButtonTemplate")
-  row:SetWidth(300); row:SetHeight(22)
-  row:SetPoint("TOPLEFT", listBG, "TOPLEFT", 18, -24 - (i-1)*26)
-  row._icon = row:CreateTexture(nil, "OVERLAY") -- ensure above button skin
+local function makeIconRow(parent)
+  local row = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+  row:SetWidth(340); row:SetHeight(22)
+  row._icon = row:CreateTexture(nil, "OVERLAY")
   row._icon:SetWidth(18); row._icon:SetHeight(18)
   row._icon:SetPoint("LEFT", row, "LEFT", 6, 0)
   row._label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   row._label:SetPoint("LEFT", row._icon, "RIGHT", 6, 0)
-  row:SetScript("OnClick", function()
-    if row._name then FBA_AddBox:SetText(row._name) end
-  end)
-  row:Hide()
-  bookRows[i] = row
+  return row
 end
 
--- Add/custom and Add Next Cast
+for i=1,visibleRows do
+  local r = makeIconRow(bookBG)
+  r:SetPoint("TOPLEFT", bookBG, "TOPLEFT", 18, -24 - (i-1)*26)
+  r:SetScript("OnClick", function()
+    if r._name and FBA and FBA.db then
+      local key = string.lower(r._name)
+      if not FBA.db.spells[key] then
+        FBA.db.spells[key] = { name = r._name, enabled = true, threshold = 4, sound = "default", combatOnly=false, useLongReminder=true, showCountdown=true }
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Added '"..r._name.."'")
+        FBA:UI_Refresh()
+      else
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Already tracking '"..r._name.."'")
+      end
+    end
+  end)
+  r:Hide(); bookRows[i] = r
+end
+
+for i=1,visibleRows do
+  local r = makeIconRow(trackedBG)
+  r:SetPoint("TOPLEFT", trackedBG, "TOPLEFT", 18, -24 - (i-1)*26)
+  r:SetScript("OnClick", function() FBA.UI_selectedKey = r._key; FBA:UI_RefreshDetail() end)
+  r:Hide(); trackedRows[i] = r
+end
+
+-- Bottom controls (centered below panels, not overlapping)
 local addBox = CreateFrame("EditBox", "FBA_AddBox", frame, "InputBoxTemplate")
-addBox:SetWidth(280); addBox:SetHeight(20)
-addBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -515)
+addBox:SetWidth(300); addBox:SetHeight(20)
+addBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -560)
 addBox:SetAutoFocus(false)
 
 local addBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-addBtn:SetWidth(80); addBtn:SetHeight(22)
+addBtn:SetWidth(100); addBtn:SetHeight(22)
 addBtn:SetPoint("LEFT", addBox, "RIGHT", 8, 0)
-addBtn:SetText("+ Add")
+addBtn:SetText("Add by name")
 addBtn:SetScript("OnClick", function()
   local nm = FBA_AddBox:GetText()
   if nm and nm ~= "" and FBA and FBA.db then
     local key = string.lower(nm)
     if not FBA.db.spells[key] then
-      FBA.db.spells[key] = { name = nm, enabled = true, threshold = 4, sound = "default", combatOnly=false, useLongReminder=true }
+      FBA.db.spells[key] = { name = nm, enabled = true, threshold = 4, sound = "default", combatOnly=false, useLongReminder=true, showCountdown=true }
       FBA_AddBox:SetText("")
       FBA:UI_Refresh()
       DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Added '"..nm.."'")
@@ -239,13 +261,13 @@ addNextBtn:SetPoint("LEFT", addBtn, "RIGHT", 8, 0)
 addNextBtn:SetText("Add Next Cast")
 addNextBtn:SetScript("OnClick", function()
   FBA.UI_waitNextCast = true
-  DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Watching your next cast...")
+  DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Watching your next cast; the spell you cast next will be added automatically.")
 end)
 
--- Right detail panel
+-- Right detail panel (to the far right)
 local detBG = CreateFrame("Frame", nil, frame)
-detBG:SetWidth(360); detBG:SetHeight(320)
-detBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 380, -180)
+detBG:SetWidth(360); detBG:SetHeight(200)
+detBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 480, -560)
 detBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
                     tile = true, tileSize = 16, edgeSize = 12,
@@ -295,8 +317,18 @@ cbLong:SetScript("OnClick", function()
   end
 end)
 
+local cbCD = CreateFrame("CheckButton", "FBA_CBCDown", detBG, "UICheckButtonTemplate")
+cbCD:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -132)
+FBA_CBCDownText:SetText("Live countdown for this buff")
+cbCD:SetScript("OnClick", function()
+  local key = FBA.UI_selectedKey
+  if key and FBA.db and FBA.db.spells[key] then
+    FBA.db.spells[key].showCountdown = FBA_CBCDown:GetChecked()
+  end
+end)
+
 local lblDelay = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lblDelay:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -136)
+lblDelay:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -160)
 lblDelay:SetText("Delay (seconds):")
 
 local ebDelay = CreateFrame("EditBox", "FBA_EBDelay", detBG, "InputBoxTemplate")
@@ -306,7 +338,7 @@ ebDelay:SetAutoFocus(false)
 ebDelay:SetScript("OnEnterPressed", function() this:ClearFocus() end)
 
 local lblSound = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lblSound:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -166)
+lblSound:SetPoint("TOPLEFT", detBG, "TOPLEFT", 200, -160)
 lblSound:SetText("Sound:")
 
 local ddSound = CreateFrame("Button", "FBA_DDSound", detBG, "UIPanelButtonTemplate")
@@ -334,7 +366,7 @@ ddSound:SetScript("OnClick", function()
 end)
 
 local ebSound = CreateFrame("EditBox", "FBA_EBSoundPath", detBG, "InputBoxTemplate")
-ebSound:SetWidth(220); ebSound:SetHeight(20)
+ebSound:SetWidth(200); ebSound:SetHeight(20)
 ebSound:SetPoint("LEFT", ddSound, "RIGHT", 8, 0)
 ebSound:SetAutoFocus(false)
 ebSound:Hide()
@@ -346,96 +378,32 @@ ebSound:SetScript("OnTextChanged", function()
   end
 end)
 
-local btnTest = CreateFrame("Button", nil, detBG, "UIPanelButtonTemplate")
-btnTest:SetWidth(80); btnTest:SetHeight(20)
-btnTest:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -196)
-btnTest:SetText("Test")
-btnTest:SetScript("OnClick", function()
-  local key = FBA.UI_selectedKey
-  if key and FBA.db and FBA.db.spells[key] then
-    local sp = FBA.db.spells[key]
-    local mode = sp.sound or "default"
-    if mode == "default" then PlaySoundFile("Sound\\Doodad\\BellTollHorde.wav")
-    elseif mode ~= "none" then
-      local ok = PlaySoundFile(mode); if not ok then PlaySoundFile("Sound\\Doodad\\BellTollHorde.wav") end
-    end
-    if FBA.db.showAlert then
-      if FBA.db.alertCountdown then
-        FBA:StartCountdownSim(sp.name, sp.threshold or 4)
-      else
-        local secs = math.floor((sp.threshold or 4) + 0.5)
-        FBA:ShowStatic(sp.name.." expiring in "..secs.." seconds")
-      end
-    end
-  end
-end)
-
-local btnRemove = CreateFrame("Button", nil, detBG, "UIPanelButtonTemplate")
-btnRemove:SetWidth(80); btnRemove:SetHeight(20)
-btnRemove:SetPoint("LEFT", btnTest, "RIGHT", 8, 0)
-btnRemove:SetText("Remove")
-btnRemove:SetScript("OnClick", function()
-  local key = FBA.UI_selectedKey
-  if key and FBA.db and FBA.db.spells[key] then
-    local nm = FBA.db.spells[key].name
-    FBA.db.spells[key] = nil
-    FBA.rt[key] = nil
-    FBA.UI_selectedKey = nil
-    FBA:UI_Refresh()
-    DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Removed '"..nm.."'")
-  end
-end)
-
--- Data / paging
-FBA.UI_tab = "tracked"
-FBA.UI_page = 1
+-- Paging state
+FBA.UI_bookPage = 1
+FBA.UI_trackPage = 1
 FBA.UI_book = {}  -- { {name=, texture=, active?=} ... }
-local function updatePageIndicator(totalCount)
+
+local function updatePageText(whichCount, whichPageText, pageVarName)
   local per = visibleRows
-  local totalPages = math.max(1, math.ceil((totalCount or 0) / per))
-  if FBA.UI_page > totalPages then FBA.UI_page = totalPages end
-  pageText:SetText("Page "..FBA.UI_page.."/"..totalPages)
+  local totalPages = math.max(1, math.ceil((whichCount or 0) / per))
+  if FBA[pageVarName] > totalPages then FBA[pageVarName] = totalPages end
+  whichPageText:SetText("Page "..FBA[pageVarName].."/"..totalPages)
 end
 
--- Tab switch
-function FBA:UI_SwitchTab(which)
-  FBA.UI_tab = which
-  if which == "tracked" then
-    listTitle:SetText("Tracked Buffs")
-    if FBA_BookFilter then FBA_BookFilter:Hide() end
-    for i=1,visibleRows do trackedRows[i]:Show(); bookRows[i]:Hide() end
-  else
-    listTitle:SetText("Spellbook (actives first; click a spell, then + Add)")
-    if FBA_BookFilter then FBA_BookFilter:Show() end
-    -- build book list with actives first
-    FBA.UI_book = FBA:BuildBookList(nil)
-    for i=1,visibleRows do trackedRows[i]:Hide(); bookRows[i]:Show() end
-  end
-  FBA.UI_page = 1
-  FBA:UI_Refresh()
-end
-tabTracked:SetScript("OnClick", function() FBA:UI_SwitchTab("tracked") end)
-tabBook:SetScript("OnClick", function() FBA:UI_SwitchTab("book") end)
-
--- Mouse wheel to change page
-listBG:SetScript("OnMouseWheel", function()
-  if arg1 > 0 then
-    FBA.UI_page = math.max(1, (FBA.UI_page or 1) - 1)
-  else
-    FBA.UI_page = (FBA.UI_page or 1) + 1
-  end
-  FBA:UI_Refresh()
+bookPrev:SetScript("OnClick", function()
+  FBA.UI_bookPage = math.max(1, FBA.UI_bookPage - 1); FBA:UI_Refresh()
 end)
-btnPrev:SetScript("OnClick", function()
-  FBA.UI_page = math.max(1, (FBA.UI_page or 1) - 1)
-  FBA:UI_Refresh()
+bookNext:SetScript("OnClick", function()
+  FBA.UI_bookPage = FBA.UI_bookPage + 1; FBA:UI_Refresh()
 end)
-btnNext:SetScript("OnClick", function()
-  FBA.UI_page = (FBA.UI_page or 1) + 1
-  FBA:UI_Refresh()
+trackedPrev:SetScript("OnClick", function()
+  FBA.UI_trackPage = math.max(1, FBA.UI_trackPage - 1); FBA:UI_Refresh()
+end)
+trackedNext:SetScript("OnClick", function()
+  FBA.UI_trackPage = FBA.UI_trackPage + 1; FBA:UI_Refresh()
 end)
 
--- Refresh lists
+-- Refresh UI
 function FBA:UI_Refresh()
   if not FBA or not FBA.db then return end
 
@@ -444,75 +412,66 @@ function FBA:UI_Refresh()
   FBA_CBCountdown:SetChecked(FBA.db.alertCountdown and 1 or 0)
   FBA_CBMinimap:SetChecked(FBA.db.minimap.show and 1 or 0)
 
-  if FBA.UI_tab == "book" then
-    -- (re)build with filter
-    local filter = FBA_BookFilter and FBA_BookFilter:GetText() or ""
-    local fl = (filter and filter ~= "" and string.lower(filter)) or nil
-    FBA.UI_book = FBA:BuildBookList(fl)
+  -- left: book
+  local filter = FBA_BookFilter and FBA_BookFilter:GetText() or ""
+  local fl = (filter and filter ~= "" and string.lower(filter)) or nil
+  FBA.UI_book = FBA:BuildBookList(fl)
 
-    local all = FBA.UI_book or {}
-    local per = visibleRows
-    updatePageIndicator(table.getn(all))
-    local start = ((FBA.UI_page or 1)-1)*per + 1
-    for row=1,visibleRows do
-      local idx = start + (row-1)
-      local entry = all[idx]
-      local w = bookRows[row]
-      if entry then
-        w._name = entry.name
-        w._icon:SetTexture(entry.texture or "Interface\\Icons\\INV_Misc_QuestionMark")
-        local label = entry.name
-        if entry.active then label = label.." |cff55ff55(active)|r" end
-        w._label:SetText(label)
-        w:Show()
-      else
-        w._name = nil
-        w._label:SetText("")
-        w._icon:SetTexture(nil)
-        w:Hide()
-      end
-    end
-    FBA:UI_RefreshDetail()
-    return
-  end
-
-  -- tracked
-  local all = {}
-  for key, sp in pairs(FBA.db.spells) do
-    table.insert(all, { key=key, name=sp.name, enabled=sp.enabled })
-  end
-  table.sort(all, function(a,b) return string.lower(a.name) < string.lower(b.name) end)
-
-  local per = visibleRows
-  updatePageIndicator(table.getn(all))
-  local start = ((FBA.UI_page or 1)-1)*per + 1
+  local books = FBA.UI_book or {}
+  updatePageText(table.getn(books), bookPageText, "UI_bookPage")
+  local bstart = ((FBA.UI_bookPage or 1)-1)*visibleRows + 1
 
   for row=1,visibleRows do
-    local idx = start + (row-1)
-    local entry = all[idx]
-    local btnRow = trackedRows[row]
+    local idx = bstart + (row-1)
+    local entry = books[idx]
+    local w = bookRows[row]
     if entry then
-      btnRow._key = entry.key
-      local label = entry.name .. (entry.enabled and " |cff55ff55[ON]|r" or " |cffff5555[OFF]|r")
-      btnRow:SetText(label)
-      btnRow:Show()
+      w._name = entry.name
+      w._icon:SetTexture(entry.texture or "Interface\\Icons\\INV_Misc_QuestionMark")
+      local label = entry.name
+      if entry.active then label = label.." |cff55ff55(active)|r" end
+      w._label:SetText(label)
+      w:Show()
     else
-      btnRow._key = nil
-      btnRow:SetText("")
-      btnRow:Hide()
+      w._name = nil
+      w._label:SetText("")
+      w._icon:SetTexture(nil)
+      w:Hide()
+    end
+  end
+
+  -- right: tracked
+  local tracked = {}
+  for key, sp in pairs(FBA.db.spells) do
+    table.insert(tracked, { key=key, name=sp.name, enabled=sp.enabled })
+  end
+  table.sort(tracked, function(a,b) return string.lower(a.name) < string.lower(b.name) end)
+
+  updatePageText(table.getn(tracked), trackedPageText, "UI_trackPage")
+  local tstart = ((FBA.UI_trackPage or 1)-1)*visibleRows + 1
+
+  for row=1,visibleRows do
+    local idx = tstart + (row-1)
+    local entry = tracked[idx]
+    local w = trackedRows[row]
+    if entry then
+      w._key = entry.key
+      w._name = entry.name
+      w._icon:SetTexture(FBA:GetSpellTextureByName(entry.name))
+      local label = entry.name .. (entry.enabled and " |cff55ff55[ON]|r" or " |cffff5555[OFF]|r")
+      w._label:SetText(label)
+      w:Show()
+    else
+      w._key = nil
+      w._name = nil
+      w._label:SetText("")
+      w._icon:SetTexture(nil)
+      w:Hide()
     end
   end
 
   FBA:UI_RefreshDetail()
 end
-
--- Spellbook filter box
-local bookFilter = CreateFrame("EditBox", "FBA_BookFilter", frame, "InputBoxTemplate")
-bookFilter:SetWidth(300); bookFilter:SetHeight(20)
-bookFilter:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -510)
-bookFilter:SetAutoFocus(false)
-bookFilter:Hide()
-bookFilter:SetScript("OnTextChanged", function() FBA:UI_Refresh() end)
 
 function FBA:UI_RefreshDetail()
   local key = FBA.UI_selectedKey
@@ -522,6 +481,7 @@ function FBA:UI_RefreshDetail()
     FBA_CBSpellEnabled:SetChecked(sp.enabled and 1 or 0)
     FBA_CBCombat:SetChecked(sp.combatOnly and 1 or 0)
     FBA_CBLong:SetChecked(sp.useLongReminder and 1 or 0)
+    FBA_CBCDown:SetChecked((sp.showCountdown ~= false) and 1 or 0)
     FBA_EBDelay:SetText(tostring(sp.threshold or 4))
     local m = sp.sound or "default"
     FBA_DDSound._mode = (m == "default" or m == "none") and m or "custom"
@@ -537,6 +497,7 @@ function FBA:UI_RefreshDetail()
     FBA_CBSpellEnabled:SetChecked(0)
     FBA_CBCombat:SetChecked(0)
     FBA_CBLong:SetChecked(1)
+    FBA_CBCDown:SetChecked(1)
     FBA_EBDelay:SetText("")
     FBA_DDSound._mode = "default"
     FBA_DDSound:SetText("default")
@@ -546,7 +507,7 @@ end
 
 function FBA:UI_Show()
   FBA_Config:Show()
-  FBA:UI_SwitchTab(FBA.UI_tab or "tracked")
+  FBA:UI_Refresh()
 end
 function FBA:UI_Hide() FBA_Config:Hide() end
 
@@ -563,6 +524,16 @@ function FBA:UI_Init()
       end
     end
   end)
-  FBA:UI_SwitchTab("tracked")
   FBA:UI_PositionMinimapButton()
+  FBA:UI_Refresh()
+end
+
+-- UI callback from "add next cast"
+function FBA:UI_OnAddedFromCast(spellName)
+  -- Try to focus it on the tracked panel
+  local key = string.lower(spellName or "")
+  if self.db and self.db.spells[key] then
+    self.UI_selectedKey = key
+  end
+  self:UI_Refresh()
 end
