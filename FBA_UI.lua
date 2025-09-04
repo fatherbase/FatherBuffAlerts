@@ -1,5 +1,5 @@
 -- FatherBuffAlerts - Settings UI + Minimap button (WoW 1.12 / Lua 5.0)
--- Version: 2.1.10 (UI layout fix 3: tighter fit, proper margins, aligned panels)
+-- Version: 2.3.0 (Fix: Remove buttons parented to row; auto-hide when row hidden)
 
 -- =======================
 -- Minimap Button (standard ring style)
@@ -72,7 +72,7 @@ end
 -- =======================
 -- Settings Window (tighter layout, proper margins, aligned controls)
 -- =======================
-local FRAME_W, FRAME_H = 820, 540
+local FRAME_W, FRAME_H = 800, 540
 local MARGIN = 16
 local GAP = 12
 
@@ -422,6 +422,24 @@ for i=1,visibleRows do
   local r = makeIconRow(trackedBG)
   r:SetPoint("TOPLEFT", trackedBG, "TOPLEFT", 18, -36 - (i-1)*26) -- just title margin
   r:SetScript("OnClick", function() FBA.UI_selectedKey = r._key; FBA:UI_RefreshDetail() end)
+  -- Remove button (fixed to panel right)
+  local rb = r._remove or CreateFrame("Button", nil, r, "UIPanelButtonTemplate")
+  rb:SetWidth(68); rb:SetHeight(22)
+  rb:ClearAllPoints()
+  rb:SetPoint("RIGHT", r, "RIGHT", -4, 0)
+  rb:SetText("Remove")
+  rb:SetFrameStrata("HIGH")
+  rb:SetFrameLevel(r:GetFrameLevel() + 10)
+  rb:Hide()
+  rb:SetScript("OnClick", function()
+    if r._key and FBA and FBA.db and FBA.db.spells[r._key] then
+      FBA.db.spells[r._key] = nil
+      DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Removed '"..(r._name or r._key).."'")
+      FBA:UI_Refresh()
+    end
+  end)
+  r._remove = rb
+
   r:Hide(); trackedRows[i] = r
 end
 
@@ -478,12 +496,12 @@ function FBA:UI_Refresh()
       local label = entry.name
       if entry.active then label = label.." |cff55ff55(active)|r" end
       w._label:SetText(label)
-      w:Show()
+      w:Show(); if w._remove then w._remove:Show() end
     else
       w._name = nil
       w._label:SetText("")
       w._icon:SetTexture(nil)
-      w:Hide()
+      w:Hide(); if w._remove then w._remove:Hide() end
     end
   end
 
@@ -497,6 +515,13 @@ function FBA:UI_Refresh()
   updatePageText(table.getn(tracked), trackedPageText, "UI_trackPage")
   local tstart = ((FBA.UI_trackPage or 1)-1)*visibleRows + 1
 
+  
+  -- Hide all Remove buttons by default for safety (will re-show for populated rows)
+  for i=1,visibleRows do
+    local tw = trackedRows and trackedRows[i]
+    if tw and tw._remove then tw._remove:Hide() end
+  end
+
   for row=1,visibleRows do
     local idx = tstart + (row-1)
     local entry = tracked[idx]
@@ -507,7 +532,7 @@ function FBA:UI_Refresh()
       w._icon:SetTexture(FBA:GetSpellTextureByName(entry.name))
       local label = entry.name .. (entry.enabled and " |cff55ff55[ON]|r" or " |cffff5555[OFF]|r")
       w._label:SetText(label)
-      w:Show()
+      w:Show(); if w._remove then w._remove:Show() end
     else
       w._key = nil
       w._name = nil

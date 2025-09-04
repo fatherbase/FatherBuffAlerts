@@ -1,5 +1,5 @@
 -- FatherBuffAlerts - Spellbook & Active Buff helpers (WoW 1.12)
--- Version: 2.1.9
+-- Version: 2.3.0
 
 FBA.iconCache = FBA.iconCache or {}
 

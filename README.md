@@ -7,6 +7,10 @@ Per-character **multi-buff** expiry alerts with a **sound** and an optional **ce
 
 ## Changelog
 
+### 2.3.0
+
+- Maintenance release: version bump and rebuild for distribution.
+
 ### 2.1.4
 
 - **Test alerts:** `/fba test <Buff>` now mirrors real behavior.
@@ -16,38 +20,6 @@ Per-character **multi-buff** expiry alerts with a **sound** and an optional **ce
 - **Core timing:** Added per-buff runtime (`seenMaxTL`, `longPlayed`, `shortPlayed`) to prevent duplicate triggers and to detect long-duration instances reliably.
 - **Countdown scope:** Live countdown is used **only** for near-expiry alerts; long-buff reminder never starts a countdown.
 - **Minimap icon:** Fixed blank icon on Vanilla by using explicit Normal/Pushed/Highlight textures with proper texcoords and sizing.
-
-### 2.1.2
-
-- **Fix:** Resolved a Lua syntax error in `FBA_Core.lua` (unexpected `}`) that prevented the addon from loading.
-
-### 2.1.1
-
-- **Fix:** Minimap button now shows a proper icon and anchors safely to the minimap center on first load; respects saved angle/visibility after variables load.
-- **Fix:** Added nil-guards across the UI to prevent “attempt to index global 'FBA' (a nil value)” if the button is clicked before init completes.
-- **Stability:** Cleaned up `/fba set ...` parsing and return paths; tightened 1.12-safe logic and ensured all branches close correctly.
-- **Stability:** More defensive defaults (sound fallback, splash state) to avoid partial-init edge cases.
-
-### 2.1.0
-
-- **Settings UI:** In-game window with two tabs:
-  - **Tracked** — view/edit/remove buffs you’re tracking; per-buff settings.
-  - **Spellbook** — suggests names from your spellbook; click a name then **+ Add**.
-- **Minimap button:** Draggable around the minimap; left-click to open settings.
-- **First-run onboarding:** Settings open automatically so you can choose buffs.
-- **Per-character master enable** exposed in UI.
-- **Performance:** Disabled or removed buffs are skipped from processing.
-
-### 2.0.0
-
-- **New addon:** FatherBuffAlerts (`/fba`) with **per-character** saved variables.
-- Track **multiple buffs**, each with its **own**:
-  - Alert delay (seconds before expiry)
-  - Sound (default / none / custom file path)
-  - Combat-only toggle
-  - Optional **long-buff reminder** (see below)
-- **Center-screen splash** with optional **live countdown** and movable position.
-- **Spellbook suggestion** list to help add buff names quickly.
 
 ---
 
