@@ -400,7 +400,7 @@ local function makeIconRow(parent)
 end
 
 for i=1,visibleRows do
-  -- Left cell: frame with icon-only click, Blizzard-style; extra vertical spacing
+  -- Left cell: frame + icon-only click (Blizzard-like)
   local r = CreateFrame("Frame", nil, bookBG)
   r:SetHeight(26); r:SetWidth(math.floor((panelW-36)/2))
   r:SetPoint("TOPLEFT", bookBG, "TOPLEFT", 18, -52 - (i-1)*30)
@@ -408,26 +408,32 @@ for i=1,visibleRows do
   r._iconBtn:SetWidth(26); r._iconBtn:SetHeight(26)
   r._iconBtn:SetPoint("LEFT", r, "LEFT", 0, 0)
   r._icon = r._iconBtn:CreateTexture(nil, "ARTWORK"); r._icon:SetAllPoints(r._iconBtn)
-  -- 1px hover border on top of the glow
-  r._hoverBorder = r:CreateTexture(nil, "OVERLAY")
-  r._hoverBorder:SetTexture("Interface\\Buttons\\WHITE8X8")
+  if r._icon.SetTexCoord then r._icon:SetTexCoord(0.06,0.94,0.06,0.94) end
+  r._iconBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
+  local hl = r._iconBtn:GetHighlightTexture(); if hl and hl.SetBlendMode then hl:SetBlendMode("ADD"); hl:SetAlpha(0.35) end
+  r._hoverBorder = r:CreateTexture(nil, "OVERLAY"); r._hoverBorder:SetTexture("Interface\\Buttons\\WHITE8X8")
   r._hoverBorder:SetVertexColor(0.25, 0.6, 1.0, 1)
   r._hoverBorder:SetPoint("TOPLEFT", r._iconBtn, "TOPLEFT", -1, 1)
   r._hoverBorder:SetPoint("BOTTOMRIGHT", r._iconBtn, "BOTTOMRIGHT", 1, -1)
   r._hoverBorder:Hide()
   r._iconBtn:SetScript("OnEnter", function() if r._hoverBorder then r._hoverBorder:Show() end end)
   r._iconBtn:SetScript("OnLeave", function() if r._hoverBorder then r._hoverBorder:Hide() end end)
-
-  if r._icon.SetTexCoord then r._icon:SetTexCoord(0.06,0.94,0.06,0.94) end
-  r._iconBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
-  local hl = r._iconBtn:GetHighlightTexture(); if hl and hl.SetBlendMode then hl:SetBlendMode("ADD"); hl:SetAlpha(0.35) end
-  r._label = r:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  r._label:SetPoint("TOPLEFT", r._iconBtn, "TOPRIGHT", 8, -2)
-  r._sub = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  r._sub:SetPoint("TOPLEFT", r._label, "BOTTOMLEFT", 0, -2)
-  r._iconBtn:SetScript("OnClick", function() FBA.UI_selectedKey = r._key; FBA:UI_RefreshDetail() end)
+  r._label = r:CreateFontString(nil, "OVERLAY", "GameFontNormal"); r._label:SetPoint("TOPLEFT", r._iconBtn, "TOPRIGHT", 8, -2)
+  r._sub = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall"); r._sub:SetPoint("TOPLEFT", r._label, "BOTTOMLEFT", 0, -2)
+  r._iconBtn:SetScript("OnClick", function()
+    if r._name and FBA and FBA.db then
+      local key = string.lower(r._name)
+      if not FBA.db.spells[key] then
+        FBA.db.spells[key] = { name = r._name, enabled = true, threshold = 4, sound = "default", combatOnly=false, useLongReminder=true, showCountdown=true, showSplash=true }
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Added '"..r._name.."'")
+        FBA:UI_Refresh()
+      else
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Already tracking '"..r._name.."'")
+      end
+    end
+  end)
   r:Hide(); bookRows[i] = r
-  -- Right cell (mirrors left)
+  -- Right cell mirrors left
   local r2 = CreateFrame("Frame", nil, bookBG)
   r2:SetHeight(26); r2:SetWidth(math.floor((panelW-36)/2))
   r2:SetPoint("TOPLEFT", bookBG, "TOPLEFT", 18 + math.floor((panelW-36)/2), -52 - (i-1)*30)
@@ -435,45 +441,37 @@ for i=1,visibleRows do
   r2._iconBtn:SetWidth(26); r2._iconBtn:SetHeight(26)
   r2._iconBtn:SetPoint("LEFT", r2, "LEFT", 0, 0)
   r2._icon = r2._iconBtn:CreateTexture(nil, "ARTWORK"); r2._icon:SetAllPoints(r2._iconBtn)
-  -- 1px hover border on top of the glow
-  r2._hoverBorder = r2:CreateTexture(nil, "OVERLAY")
-  r2._hoverBorder:SetTexture("Interface\\Buttons\\WHITE8X8")
+  if r2._icon.SetTexCoord then r2._icon:SetTexCoord(0.06,0.94,0.06,0.94) end
+  r2._iconBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
+  local hl2 = r2._iconBtn:GetHighlightTexture(); if hl2 and hl2.SetBlendMode then hl2:SetBlendMode("ADD"); hl2:SetAlpha(0.35) end
+  r2._hoverBorder = r2:CreateTexture(nil, "OVERLAY"); r2._hoverBorder:SetTexture("Interface\\Buttons\\WHITE8X8")
   r2._hoverBorder:SetVertexColor(0.25, 0.6, 1.0, 1)
   r2._hoverBorder:SetPoint("TOPLEFT", r2._iconBtn, "TOPLEFT", -1, 1)
   r2._hoverBorder:SetPoint("BOTTOMRIGHT", r2._iconBtn, "BOTTOMRIGHT", 1, -1)
   r2._hoverBorder:Hide()
   r2._iconBtn:SetScript("OnEnter", function() if r2._hoverBorder then r2._hoverBorder:Show() end end)
   r2._iconBtn:SetScript("OnLeave", function() if r2._hoverBorder then r2._hoverBorder:Hide() end end)
-
-  if r2._icon.SetTexCoord then r2._icon:SetTexCoord(0.06,0.94,0.06,0.94) end
-  r2._iconBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
-  local hl2 = r2._iconBtn:GetHighlightTexture(); if hl2 and hl2.SetBlendMode then hl2:SetBlendMode("ADD"); hl2:SetAlpha(0.35) end
-  r2._label = r2:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  r2._label:SetPoint("TOPLEFT", r2._iconBtn, "TOPRIGHT", 8, -2)
-  r2._sub = r2:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  r2._sub:SetPoint("TOPLEFT", r2._label, "BOTTOMLEFT", 0, -2)
-  r2._iconBtn:SetScript("OnClick", function() FBA.UI_selectedKey = r2._key; FBA:UI_RefreshDetail() end)
+  r2._label = r2:CreateFontString(nil, "OVERLAY", "GameFontNormal"); r2._label:SetPoint("TOPLEFT", r2._iconBtn, "TOPRIGHT", 8, -2)
+  r2._sub = r2:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall"); r2._sub:SetPoint("TOPLEFT", r2._label, "BOTTOMLEFT", 0, -2)
+  r2._iconBtn:SetScript("OnClick", function()
+    if r2._name and FBA and FBA.db then
+      local key = string.lower(r2._name)
+      if not FBA.db.spells[key] then
+        FBA.db.spells[key] = { name = r2._name, enabled = true, threshold = 4, sound = "default", combatOnly=false, useLongReminder=true, showCountdown=true, showSplash=true }
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Added '"..r2._name.."'")
+        FBA:UI_Refresh()
+      else
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Already tracking '"..r2._name.."'")
+      end
+    end
+  end)
   r2:Hide(); bookRowsR[i] = r2
 end
 
 for i=1,visibleRows do
   local r = makeIconRow(trackedBG)
   r:SetPoint("TOPLEFT", trackedBG, "TOPLEFT", 18, -36 - (i-1)*26) -- just title margin
-  r:SetWidth(panelW - 120) -- leave room for Remove button
   r:SetScript("OnClick", function() FBA.UI_selectedKey = r._key; FBA:UI_RefreshDetail() end)
-  -- Remove button (per row; visible only when there is an entry)
-  r._remove = CreateFrame("Button", nil, trackedBG, "UIPanelButtonTemplate")
-  r._remove:SetWidth(70); r._remove:SetHeight(20)
-  r._remove:SetPoint("LEFT", r, "RIGHT", 6, 0)
-  r._remove:SetText("Remove")
-  r._remove:Hide()
-  r._remove:SetScript("OnClick", function()
-    if r._key and FBA and FBA.db and FBA.db.spells[r._key] then
-      FBA.db.spells[r._key] = nil
-      FBA:UI_Refresh()
-      DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Removed '"..(r._name or r._key or "?").."'")
-    end
-  end)
   r:Hide(); trackedRows[i] = r
 end
 
@@ -503,7 +501,7 @@ trackedNext:SetScript("OnClick", function()
 end)
 
 
--- UI helper (1.12-safe): returns spellbook subtext (Rank/Passive/etc.) for a given spell name.
+-- UI helper (1.12-safe): returns the spellbook subtext (Rank/Passive/etc.) for a given name
 function FBA_UI_GetSubtextByName(name)
   if not name or name == "" then return "" end
   if not (GetNumSpellTabs and GetSpellTabInfo and GetSpellName) then return "" end
@@ -568,6 +566,7 @@ function FBA:UI_Refresh()
       wR._name = nil; if wR._sub then wR._sub:SetText("") end; wR._label:SetText(""); wR._icon:SetTexture(nil); wR:Hide()
     end
   end
+
 
   -- right: tracked
   local tracked = {}
