@@ -641,7 +641,7 @@ function FBA:UI_Refresh()
       local label = entryL.name; label = string.gsub(label, " %b()", "")
       if entryL.active then label = label.." |cff55ff55(active)|r" end
       wL._label:SetText(label)
-      if wL._sub then wL._sub:SetText(FBA_UI_GetSubtextByName(entryL.name) or "") end
+      if wL._sub then local _s = FBA_UI_GetSubtextByName(entryL.name) or ""; if entryL.enabled then _s = (_s ~= "" and (_s.." ") or "") .. "(active)" end; wL._sub:SetText(_s) end
       wL:Show()
     else
       wL._name = nil; if wL._sub then wL._sub:SetText("") end; wL._label:SetText(""); wL._icon:SetTexture(nil); wL:Hide()
@@ -652,7 +652,7 @@ function FBA:UI_Refresh()
       local labelR = entryR.name; labelR = string.gsub(labelR, " %b()", "")
       if entryR.active then labelR = labelR.." |cff55ff55(active)|r" end
       wR._label:SetText(labelR)
-      if wR._sub then wR._sub:SetText(FBA_UI_GetSubtextByName(entryR.name) or "") end
+      if wR._sub then local _s = FBA_UI_GetSubtextByName(entryR.name) or ""; if entryR.enabled then _s = (_s ~= "" and (_s.." ") or "") .. "(active)" end; wR._sub:SetText(_s) end
       wR:Show()
     else
       wR._name = nil; if wR._sub then wR._sub:SetText("") end; wR._label:SetText(""); wR._icon:SetTexture(nil); wR:Hide()
@@ -689,7 +689,7 @@ function FBA:UI_Refresh()
     wL._icon:SetTexture(FBA:GetSpellTextureByName(entryL.name))
     local nameL = entryL.name; nameL = string.gsub(nameL, " %b()", "")
     wL._label:SetText(nameL)
-    if wL._sub then wL._sub:SetText(FBA_UI_GetSubtextByName(entryL.name) or "") end
+    if wL._sub then local _s = FBA_UI_GetSubtextByName(entryL.name) or ""; if entryL.enabled then _s = (_s ~= "" and (_s.." ") or "") .. "(active)" end; wL._sub:SetText(_s) end
     if wL._x then wL._x:Show() end
     wL:Show()
   else
@@ -700,7 +700,7 @@ function FBA:UI_Refresh()
     wR._icon:SetTexture(FBA:GetSpellTextureByName(entryR.name))
     local nameR = entryR.name; nameR = string.gsub(nameR, " %b()", "")
     wR._label:SetText(nameR)
-    if wR._sub then wR._sub:SetText(FBA_UI_GetSubtextByName(entryR.name) or "") end
+    if wR._sub then local _s = FBA_UI_GetSubtextByName(entryR.name) or ""; if entryR.enabled then _s = (_s ~= "" and (_s.." ") or "") .. "(active)" end; wR._sub:SetText(_s) end
     if wR._x then wR._x:Show() end
     wR:Show()
   else
