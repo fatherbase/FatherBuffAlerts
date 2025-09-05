@@ -408,6 +408,16 @@ for i=1,visibleRows do
   r._iconBtn:SetWidth(26); r._iconBtn:SetHeight(26)
   r._iconBtn:SetPoint("LEFT", r, "LEFT", 0, 0)
   r._icon = r._iconBtn:CreateTexture(nil, "ARTWORK"); r._icon:SetAllPoints(r._iconBtn)
+  -- 1px hover border on top of the glow
+  r._hoverBorder = r:CreateTexture(nil, "OVERLAY")
+  r._hoverBorder:SetTexture("Interface\\Buttons\\WHITE8X8")
+  r._hoverBorder:SetVertexColor(0.25, 0.6, 1.0, 1)
+  r._hoverBorder:SetPoint("TOPLEFT", r._iconBtn, "TOPLEFT", -1, 1)
+  r._hoverBorder:SetPoint("BOTTOMRIGHT", r._iconBtn, "BOTTOMRIGHT", 1, -1)
+  r._hoverBorder:Hide()
+  r._iconBtn:SetScript("OnEnter", function() if r._hoverBorder then r._hoverBorder:Show() end end)
+  r._iconBtn:SetScript("OnLeave", function() if r._hoverBorder then r._hoverBorder:Hide() end end)
+
   if r._icon.SetTexCoord then r._icon:SetTexCoord(0.06,0.94,0.06,0.94) end
   r._iconBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
   local hl = r._iconBtn:GetHighlightTexture(); if hl and hl.SetBlendMode then hl:SetBlendMode("ADD"); hl:SetAlpha(0.35) end
@@ -425,6 +435,16 @@ for i=1,visibleRows do
   r2._iconBtn:SetWidth(26); r2._iconBtn:SetHeight(26)
   r2._iconBtn:SetPoint("LEFT", r2, "LEFT", 0, 0)
   r2._icon = r2._iconBtn:CreateTexture(nil, "ARTWORK"); r2._icon:SetAllPoints(r2._iconBtn)
+  -- 1px hover border on top of the glow
+  r2._hoverBorder = r2:CreateTexture(nil, "OVERLAY")
+  r2._hoverBorder:SetTexture("Interface\\Buttons\\WHITE8X8")
+  r2._hoverBorder:SetVertexColor(0.25, 0.6, 1.0, 1)
+  r2._hoverBorder:SetPoint("TOPLEFT", r2._iconBtn, "TOPLEFT", -1, 1)
+  r2._hoverBorder:SetPoint("BOTTOMRIGHT", r2._iconBtn, "BOTTOMRIGHT", 1, -1)
+  r2._hoverBorder:Hide()
+  r2._iconBtn:SetScript("OnEnter", function() if r2._hoverBorder then r2._hoverBorder:Show() end end)
+  r2._iconBtn:SetScript("OnLeave", function() if r2._hoverBorder then r2._hoverBorder:Hide() end end)
+
   if r2._icon.SetTexCoord then r2._icon:SetTexCoord(0.06,0.94,0.06,0.94) end
   r2._iconBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
   local hl2 = r2._iconBtn:GetHighlightTexture(); if hl2 and hl2.SetBlendMode then hl2:SetBlendMode("ADD"); hl2:SetAlpha(0.35) end
@@ -439,7 +459,21 @@ end
 for i=1,visibleRows do
   local r = makeIconRow(trackedBG)
   r:SetPoint("TOPLEFT", trackedBG, "TOPLEFT", 18, -36 - (i-1)*26) -- just title margin
+  r:SetWidth(panelW - 120) -- leave room for Remove button
   r:SetScript("OnClick", function() FBA.UI_selectedKey = r._key; FBA:UI_RefreshDetail() end)
+  -- Remove button (per row; visible only when there is an entry)
+  r._remove = CreateFrame("Button", nil, trackedBG, "UIPanelButtonTemplate")
+  r._remove:SetWidth(70); r._remove:SetHeight(20)
+  r._remove:SetPoint("LEFT", r, "RIGHT", 6, 0)
+  r._remove:SetText("Remove")
+  r._remove:Hide()
+  r._remove:SetScript("OnClick", function()
+    if r._key and FBA and FBA.db and FBA.db.spells[r._key] then
+      FBA.db.spells[r._key] = nil
+      FBA:UI_Refresh()
+      DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Removed '"..(r._name or r._key or "?").."'")
+    end
+  end)
   r:Hide(); trackedRows[i] = r
 end
 
