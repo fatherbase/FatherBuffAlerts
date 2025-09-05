@@ -408,7 +408,7 @@ trackedNext:SetText(">")
 -- Rows (fit inside 230px panels)
 -- Top margin ~50 (title+filter/title), bottom margin ~34 (page), available ~146 => 5 rows at 26px fits
 local visibleRows = 5
-local bookRows, trackedRows = {}, {}
+local bookRows, bookRowsR, trackedRows = {}, {}, {}
 
 local function makeIconRow(parent)
   local row = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
@@ -422,14 +422,27 @@ local function makeIconRow(parent)
 end
 
 for i=1,visibleRows do
-  local r = makeIconRow(bookBG)
-  r:SetPoint("TOPLEFT", bookBG, "TOPLEFT", 18, -52 - (i-1)*26) -- below filter row
-  r:SetScript("OnClick", function()
+  -- Left cell: plain frame + icon-only click (Blizzard spellbook style)
+  local r = CreateFrame("Frame", nil, bookBG)
+  r:SetHeight(26)
+  r:SetWidth(math.floor((panelW-36)/2))
+  r:SetPoint("TOPLEFT", bookBG, "TOPLEFT", 18, -52 - (i-1)*26)
+  r._iconBtn = CreateFrame("Button", nil, r)
+  r._iconBtn:SetWidth(26); r._iconBtn:SetHeight(26)
+  r._iconBtn:SetPoint("LEFT", r, "LEFT", 0, 0)
+  r._iconBtn:RegisterForClicks("LeftButtonUp")
+  r._icon = r._iconBtn:CreateTexture(nil, "ARTWORK")
+  r._icon:SetAllPoints(r._iconBtn)
+  if r._icon.SetTexCoord then r._icon:SetTexCoord(0.06,0.94,0.06,0.94) end
+  r._label = r:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  r._label:SetPoint("TOPLEFT", r._iconBtn, "TOPRIGHT", 8, -2)
+  r._sub = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  r._sub:SetPoint("TOPLEFT", r._label, "BOTTOMLEFT", 0, -2)
+  r._iconBtn:SetScript("OnClick", function()
     if r._name and FBA and FBA.db then
       local key = string.lower(r._name)
       if not FBA.db.spells[key] then
-        FBA.db.spells[key] = { name = r._name, enabled = true, threshold = 4, sound = "default",
-                               combatOnly=false, useLongReminder=true, showCountdown=true, showSplash=true }
+        FBA.db.spells[key] = { name = r._name, enabled = true, threshold = 4, sound = "default", combatOnly=false, useLongReminder=true, showCountdown=true, showSplash=true }
         DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Added '"..r._name.."'")
         FBA:UI_Refresh()
       else
@@ -438,12 +451,43 @@ for i=1,visibleRows do
     end
   end)
   r:Hide(); bookRows[i] = r
+  -- Right cell
+  local r2 = CreateFrame("Frame", nil, bookBG)
+  r2:SetHeight(26)
+  r2:SetWidth(math.floor((panelW-36)/2))
+  r2:SetPoint("TOPLEFT", bookBG, "TOPLEFT", 18 + math.floor((panelW-36)/2), -52 - (i-1)*26)
+  r2._iconBtn = CreateFrame("Button", nil, r2)
+  r2._iconBtn:SetWidth(26); r2._iconBtn:SetHeight(26)
+  r2._iconBtn:SetPoint("LEFT", r2, "LEFT", 0, 0)
+  r2._iconBtn:RegisterForClicks("LeftButtonUp")
+  r2._icon = r2._iconBtn:CreateTexture(nil, "ARTWORK")
+  r2._icon:SetAllPoints(r2._iconBtn)
+  if r2._icon.SetTexCoord then r2._icon:SetTexCoord(0.06,0.94,0.06,0.94) end
+  r2._label = r2:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  r2._label:SetPoint("TOPLEFT", r2._iconBtn, "TOPRIGHT", 8, -2)
+  r2._sub = r2:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  r2._sub:SetPoint("TOPLEFT", r2._label, "BOTTOMLEFT", 0, -2)
+  r2._iconBtn:SetScript("OnClick", function()
+    if r2._name and FBA and FBA.db then
+      local key = string.lower(r2._name)
+      if not FBA.db.spells[key] then
+        FBA.db.spells[key] = { name = r2._name, enabled = true, threshold = 4, sound = "default", combatOnly=false, useLongReminder=true, showCountdown=true, showSplash=true }
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Added '"..r2._name.."'")
+        FBA:UI_Refresh()
+      else
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Already tracking '"..r2._name.."'")
+      end
+    end
+  end)
+  r2:Hide(); bookRowsR[i] = r2
 end
 
 for i=1,visibleRows do
   local r = makeIconRow(trackedBG)
   r:SetPoint("TOPLEFT", trackedBG, "TOPLEFT", 18, -36 - (i-1)*26) -- just title margin
   r:SetScript("OnClick", function() FBA.UI_selectedKey = r._key; FBA:UI_RefreshDetail() end)
+  -- FBA_UI_TRACK_VISUAL: square 24px icon
+  if r._icon then r._icon:SetWidth(24); r._icon:SetHeight(24); if r._icon.SetTexCoord then r._icon:SetTexCoord(0.06,0.94,0.06,0.94) end end
   -- Remove button (fixed to panel right)
   local rb = r._remove or CreateFrame("Button", nil, r, "UIPanelButtonTemplate")
   rb:SetWidth(68); rb:SetHeight(22)
@@ -470,8 +514,8 @@ FBA.UI_bookPage = 1
 FBA.UI_trackPage = 1
 FBA.UI_book = {}  -- { {name=, texture=, active?=} ... }
 
-local function updatePageText(whichCount, whichPageText, pageVarName)
-  local per = visibleRows
+local function updatePageText(whichCount, whichPageText, pageVarName, perOverride)
+  local per = perOverride or visibleRows
   local totalPages = math.max(1, math.ceil((whichCount or 0) / per))
   if FBA[pageVarName] > totalPages then FBA[pageVarName] = totalPages end
   whichPageText:SetText("Page "..FBA[pageVarName].."/"..totalPages)
@@ -490,6 +534,24 @@ trackedNext:SetScript("OnClick", function()
   FBA.UI_trackPage = FBA.UI_trackPage + 1; FBA:UI_Refresh()
 end)
 
+
+-- UI helper (1.12-safe): returns the spellbook subtext (e.g., Rank, Passive, Journeyman) for a given spell name.
+function FBA_UI_GetSubtextByName(name)
+  if not name or name == "" then return "" end
+  if not (GetNumSpellTabs and GetSpellTabInfo and GetSpellName) then return "" end
+  for t=1, GetNumSpellTabs() do
+    local _, _, offset, num = GetSpellTabInfo(t)
+    if offset and num then
+      for i=1, num do
+        local idx = offset + i
+        local nm, rank = GetSpellName(idx, "spell")
+        if nm == name then return rank or "" end
+      end
+    end
+  end
+  return ""
+end
+
 -- Refresh UI
 function FBA:UI_Refresh()
   if not FBA or not FBA.db then return end
@@ -505,25 +567,38 @@ function FBA:UI_Refresh()
   FBA.UI_book = FBA:BuildBookList(fl)
 
   local books = FBA.UI_book or {}
-  updatePageText(table.getn(books), bookPageText, "UI_bookPage")
-  local bstart = ((FBA.UI_bookPage or 1)-1)*visibleRows + 1
+  updatePageText(table.getn(books), bookPageText, "UI_bookPage", visibleRows*2)
+  local bstart = ((FBA.UI_bookPage or 1)-1)*(visibleRows*2) + 1
 
   for row=1,visibleRows do
-    local idx = bstart + (row-1)
-    local entry = books[idx]
+    local idxL = bstart + (row-1)*2
+    local idxR = idxL + 1
+    local entry = books[idxL]
     local w = bookRows[row]
     if entry then
       w._name = entry.name
       w._icon:SetTexture(entry.texture or "Interface\\Icons\\INV_Misc_QuestionMark")
       local label = entry.name
       if entry.active then label = label.." |cff55ff55(active)|r" end
+      do local _sub = FBA_UI_GetSubtextByName(entry.name); if _sub and _sub ~= "" then label = label .. " |cffbbbbbb(".._sub..")|r" end end
       w._label:SetText(label)
-      w:Show(); if w._remove then w._remove:Show() end
+      w:Show()
     else
-      w._name = nil
-      w._label:SetText("")
-      w._icon:SetTexture(nil)
-      w:Hide(); if w._remove then w._remove:Hide() end
+      w._name = nil; w._icon:SetTexture(nil); w:Hide()
+    end
+    local entryR = books[idxR]
+    local wR = bookRowsR[row]
+    if entryR then
+      wR._name = entryR.name
+      wR._icon:SetTexture(entryR.texture or "Interface\\Icons\\INV_Misc_QuestionMark")
+      local labelR = entryR.name
+      if entryR.active then labelR = labelR.." |cff55ff55(active)|r" end
+      do local _subR = FBA_UI_GetSubtextByName(entryR.name); if _subR and _subR ~= "" then labelR = labelR .. " |cffbbbbbb(".._subR..")|r" end end
+      wR._label:SetText(labelR)
+      if wR._sub then wR._sub:SetText(FBA_UI_GetSubtextByName(entryR.name) or "") end
+      wR:Show()
+    else
+      wR._name = nil; wR._icon:SetTexture(nil); wR:Hide()
     end
   end
 
