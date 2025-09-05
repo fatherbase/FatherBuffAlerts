@@ -1,5 +1,5 @@
 -- FatherBuffAlerts - Settings UI + Minimap button (WoW 1.12 / Lua 5.0)
--- Version: 2.1.10 (UI layout fix 3: tighter fit, proper margins, aligned panels)
+-- Version: 2.3.0 (Fix: Remove buttons parented to row; auto-hide when row hidden)
 
 -- =======================
 -- Minimap Button (standard ring style)
@@ -72,9 +72,10 @@ end
 -- =======================
 -- Settings Window (tighter layout, proper margins, aligned controls)
 -- =======================
-local FRAME_W, FRAME_H = 820, 540
+local FRAME_W, FRAME_H = 800, 540
 local MARGIN = 16
 local GAP = 12
+local RowDelta = 26
 
 local frame = CreateFrame("Frame", "FBA_Config", UIParent)
 frame:SetWidth(FRAME_W); frame:SetHeight(FRAME_H)
@@ -126,18 +127,27 @@ cbMinimap:SetScript("OnClick", function()
   end
 end)
 
--- Master Enable (second row, left)
+-- Row 2: Master Enable (second row, left)
 local cbEnabled = CreateFrame("CheckButton", "FBA_CBEnabled", frame, "UICheckButtonTemplate")
-cbEnabled:SetPoint("TOPLEFT", frame, "TOPLEFT", MARGIN, -64)
+cbEnabled:SetPoint("TOPLEFT", frame, "TOPLEFT", MARGIN, rowY - RowDelta)
 FBA_CBEnabledText:SetText("Addon enabled")
 cbEnabled:SetScript("OnClick", function() if FBA and FBA.db then FBA.db.enabled = FBA_CBEnabled:GetChecked() end end)
 
 -- ===== Buff Settings strip (left) and Quick Add (right) aligned on same level
+local buffSettingsRow = rowY - 2 * RowDelta - 10
+
+local buffSettingsFrameRow = -46
+local buffSettingsFrameRowDelta = 26
+
+local buffSettingsFrameColumn = 12
+
+local firstPanelRowHeight = 135
+
 -- keep widths within inner space (FRAME_W - 2*MARGIN)
 --  BuffSettings 540 + GAP(12) + QuickAdd 220 = 772 <= 820-32 = 788 (fits)
 local detBG = CreateFrame("Frame", nil, frame)
-detBG:SetWidth(540); detBG:SetHeight(150)
-detBG:SetPoint("TOPLEFT", frame, "TOPLEFT", MARGIN, -96)
+detBG:SetWidth(410); detBG:SetHeight(firstPanelRowHeight)
+detBG:SetPoint("TOPLEFT", frame, "TOPLEFT", MARGIN, buffSettingsRow)
 detBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
                     tile = true, tileSize = 16, edgeSize = 12,
@@ -145,20 +155,22 @@ detBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
 detBG:SetBackdropColor(0,0,0,0.5)
 
 local detTitle = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-detTitle:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -8)
+detTitle:SetPoint("TOPLEFT", detBG, "TOPLEFT", buffSettingsFrameColumn, -8)
 detTitle:SetText("Buff Settings")
 
 local lblName = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lblName:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -30)
+lblName:SetPoint("TOPLEFT", detBG, "TOPLEFT", buffSettingsFrameColumn, -30)
 lblName:SetText("Name: ")
 
 local txtName = detBG:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 txtName:SetPoint("LEFT", lblName, "RIGHT", 4, 0)
 txtName:SetText("—")
 
+
+
 -- Row 1 of toggles (more vertical spacing so Sound isn't too close)
 local cbSpellEnabled = CreateFrame("CheckButton", "FBA_CBSpellEnabled", detBG, "UICheckButtonTemplate")
-cbSpellEnabled:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -56)
+cbSpellEnabled:SetPoint("TOPLEFT", detBG, "TOPLEFT", buffSettingsFrameColumn -4, buffSettingsFrameRow)
 FBA_CBSpellEnabledText:SetText("Enable this buff")
 cbSpellEnabled:SetScript("OnClick", function()
   local key = FBA.UI_selectedKey
@@ -190,7 +202,7 @@ end)
 
 -- Row 2 of toggles
 local cbLong = CreateFrame("CheckButton", "FBA_CBLong", detBG, "UICheckButtonTemplate")
-cbLong:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -80)
+cbLong:SetPoint("TOPLEFT", detBG, "TOPLEFT", buffSettingsFrameColumn -4, buffSettingsFrameRow - buffSettingsFrameRowDelta)
 FBA_CBLongText:SetText("5m reminder for ≥9m buffs")
 cbLong:SetScript("OnClick", function()
   local key = FBA.UI_selectedKey
@@ -221,7 +233,7 @@ ebDelay:SetScript("OnEnterPressed", function() this:ClearFocus() end)
 
 -- Row 3: Sound (extra vertical gap so it's not tight under row 2)
 local lblSound = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lblSound:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -108)
+lblSound:SetPoint("TOPLEFT", detBG, "TOPLEFT", buffSettingsFrameColumn, buffSettingsFrameRow - 2 * buffSettingsFrameRowDelta -10)
 lblSound:SetText("Sound:")
 
 local ddSound = CreateFrame("Button", "FBA_DDSound", detBG, "UIPanelButtonTemplate")
@@ -264,8 +276,18 @@ ebSound:SetScript("OnTextChanged", function()
 end)
 
 -- Quick Add panel (right of Buff Settings, same vertical level)
+
+local quickAddPanelWidth = 220
+
+local QuickAddFrameRow = -26
+local QuickAddFrameRowDelta = 6
+
+local QuickAddFrameColumn = 12
+
+
+
 local ctrlBG = CreateFrame("Frame", nil, frame)
-ctrlBG:SetWidth(220); ctrlBG:SetHeight(150)
+ctrlBG:SetWidth(quickAddPanelWidth); ctrlBG:SetHeight(firstPanelRowHeight)
 ctrlBG:SetPoint("TOPLEFT", detBG, "TOPRIGHT", GAP, 0)  -- anchored to right of detBG
 ctrlBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                      edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -274,17 +296,17 @@ ctrlBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
 ctrlBG:SetBackdropColor(0,0,0,0.5)
 
 local ctrlTitle = ctrlBG:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-ctrlTitle:SetPoint("TOPLEFT", ctrlBG, "TOPLEFT", 8, -8)
+ctrlTitle:SetPoint("TOPLEFT", ctrlBG, "TOPLEFT", QuickAddFrameColumn, -8)
 ctrlTitle:SetText("Quick Add")
 
 local addBox = CreateFrame("EditBox", "FBA_AddBox", ctrlBG, "InputBoxTemplate")
-addBox:SetWidth(192); addBox:SetHeight(20)
-addBox:SetPoint("TOPLEFT", ctrlBG, "TOPLEFT", 12, -32)
+addBox:SetWidth(quickAddPanelWidth - 2 * QuickAddFrameColumn); addBox:SetHeight(20)
+addBox:SetPoint("TOPLEFT", ctrlBG, "TOPLEFT", QuickAddFrameColumn + 4, QuickAddFrameRow)
 addBox:SetAutoFocus(false)
 
 local addBtn = CreateFrame("Button", nil, ctrlBG, "UIPanelButtonTemplate")
-addBtn:SetWidth(100); addBtn:SetHeight(22)
-addBtn:SetPoint("TOPLEFT", addBox, "BOTTOMLEFT", 0, -8)
+addBtn:SetWidth((quickAddPanelWidth - 2 * QuickAddFrameColumn)/2); addBtn:SetHeight(22)
+addBtn:SetPoint("TOPLEFT", addBox, "TOPLEFT", -6 , QuickAddFrameRow)
 addBtn:SetText("Add by name")
 addBtn:SetScript("OnClick", function()
   local nm = FBA_AddBox:GetText()
@@ -303,7 +325,7 @@ addBtn:SetScript("OnClick", function()
 end)
 
 local addNextBtn = CreateFrame("Button", nil, ctrlBG, "UIPanelButtonTemplate")
-addNextBtn:SetWidth(100); addNextBtn:SetHeight(22)
+addNextBtn:SetWidth((quickAddPanelWidth - 2 * QuickAddFrameColumn)/2); addNextBtn:SetHeight(22)
 addNextBtn:SetPoint("LEFT", addBtn, "RIGHT", 6, 0) -- fully inside the panel
 addNextBtn:SetText("Add Next Cast")
 addNextBtn:SetScript("OnClick", function()
@@ -386,7 +408,7 @@ trackedNext:SetText(">")
 -- Rows (fit inside 230px panels)
 -- Top margin ~50 (title+filter/title), bottom margin ~34 (page), available ~146 => 5 rows at 26px fits
 local visibleRows = 5
-local bookRows, bookRowsR, trackedRows = {}, {}, {}
+local bookRows, bookRowsR, trackedRows, trackedRowsR = {}, {}, {}, {}
 
 local function makeIconRow(parent)
   local row = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
@@ -469,10 +491,74 @@ for i=1,visibleRows do
 end
 
 for i=1,visibleRows do
-  local r = makeIconRow(trackedBG)
-  r:SetPoint("TOPLEFT", trackedBG, "TOPLEFT", 18, -36 - (i-1)*26) -- just title margin
-  r:SetScript("OnClick", function() FBA.UI_selectedKey = r._key; FBA:UI_RefreshDetail() end)
+  -- Tracked Left cell
+  local r = CreateFrame("Frame", nil, trackedBG)
+  r:SetHeight(26); r:SetWidth(math.floor((panelW-36)/2))
+  r:SetPoint("TOPLEFT", trackedBG, "TOPLEFT", 18, -36 - (i-1)*30)
+  r._iconBtn = CreateFrame("Button", nil, r)
+  r._iconBtn:SetWidth(26); r._iconBtn:SetHeight(26)
+  r._iconBtn:SetPoint("LEFT", r, "LEFT", 0, 0)
+  r._icon = r._iconBtn:CreateTexture(nil, "ARTWORK"); r._icon:SetAllPoints(r._iconBtn)
+  if r._icon.SetTexCoord then r._icon:SetTexCoord(0.06,0.94,0.06,0.94) end
+  r._iconBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
+  local thl = r._iconBtn:GetHighlightTexture(); if thl and thl.SetBlendMode then thl:SetBlendMode("ADD"); thl:SetAlpha(0.35) end
+  r._hoverBorder = r:CreateTexture(nil, "OVERLAY"); r._hoverBorder:SetTexture("Interface\\Buttons\\WHITE8X8")
+  r._hoverBorder:SetVertexColor(0.25,0.6,1.0,1)
+  r._hoverBorder:SetPoint("TOPLEFT", r._iconBtn, "TOPLEFT", -1, 1)
+  r._hoverBorder:SetPoint("BOTTOMRIGHT", r._iconBtn, "BOTTOMRIGHT", 1, -1)
+  r._hoverBorder:Hide()
+  r._iconBtn:SetScript("OnEnter", function() if r._hoverBorder then r._hoverBorder:Show() end end)
+  r._iconBtn:SetScript("OnLeave", function() if r._hoverBorder then r._hoverBorder:Hide() end end)
+  r._label = r:CreateFontString(nil, "OVERLAY", "GameFontNormal"); r._label:SetPoint("TOPLEFT", r._iconBtn, "TOPRIGHT", 8, -2)
+  r._sub = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall"); r._sub:SetPoint("TOPLEFT", r._label, "BOTTOMLEFT", 0, -2)
+  r._iconBtn:SetScript("OnClick", function() if r._key then FBA.UI_selectedKey = r._key; FBA:UI_RefreshDetail() end end)
+  r._x = CreateFrame("Button", nil, r, "UIPanelCloseButton")
+  r._x:SetWidth(16); r._x:SetHeight(16)
+  r._x:SetPoint("RIGHT", r, "RIGHT", -2, 0)
+  r._x:Hide()
+  r._x:SetScript("OnClick", function()
+    if r._key and FBA and FBA.db and FBA.db.spells[r._key] then
+      FBA.db.spells[r._key] = nil
+      if FBA.UI_selectedKey == r._key then FBA.UI_selectedKey = nil end
+      FBA:UI_Refresh()
+      DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Removed '"..(r._name or r._key or "?").."'")
+    end
+  end)
   r:Hide(); trackedRows[i] = r
+  -- Tracked Right cell
+  local r2 = CreateFrame("Frame", nil, trackedBG)
+  r2:SetHeight(26); r2:SetWidth(math.floor((panelW-36)/2))
+  r2:SetPoint("TOPLEFT", trackedBG, "TOPLEFT", 18 + math.floor((panelW-36)/2), -36 - (i-1)*30)
+  r2._iconBtn = CreateFrame("Button", nil, r2)
+  r2._iconBtn:SetWidth(26); r2._iconBtn:SetHeight(26)
+  r2._iconBtn:SetPoint("LEFT", r2, "LEFT", 0, 0)
+  r2._icon = r2._iconBtn:CreateTexture(nil, "ARTWORK"); r2._icon:SetAllPoints(r2._iconBtn)
+  if r2._icon.SetTexCoord then r2._icon:SetTexCoord(0.06,0.94,0.06,0.94) end
+  r2._iconBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
+  local thl2 = r2._iconBtn:GetHighlightTexture(); if thl2 and thl2.SetBlendMode then thl2:SetBlendMode("ADD"); thl2:SetAlpha(0.35) end
+  r2._hoverBorder = r2:CreateTexture(nil, "OVERLAY"); r2._hoverBorder:SetTexture("Interface\\Buttons\\WHITE8X8")
+  r2._hoverBorder:SetVertexColor(0.25,0.6,1.0,1)
+  r2._hoverBorder:SetPoint("TOPLEFT", r2._iconBtn, "TOPLEFT", -1, 1)
+  r2._hoverBorder:SetPoint("BOTTOMRIGHT", r2._iconBtn, "BOTTOMRIGHT", 1, -1)
+  r2._hoverBorder:Hide()
+  r2._iconBtn:SetScript("OnEnter", function() if r2._hoverBorder then r2._hoverBorder:Show() end end)
+  r2._iconBtn:SetScript("OnLeave", function() if r2._hoverBorder then r2._hoverBorder:Hide() end end)
+  r2._label = r2:CreateFontString(nil, "OVERLAY", "GameFontNormal"); r2._label:SetPoint("TOPLEFT", r2._iconBtn, "TOPRIGHT", 8, -2)
+  r2._sub = r2:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall"); r2._sub:SetPoint("TOPLEFT", r2._label, "BOTTOMLEFT", 0, -2)
+  r2._iconBtn:SetScript("OnClick", function() if r2._key then FBA.UI_selectedKey = r2._key; FBA:UI_RefreshDetail() end end)
+  r2._x = CreateFrame("Button", nil, r2, "UIPanelCloseButton")
+  r2._x:SetWidth(16); r2._x:SetHeight(16)
+  r2._x:SetPoint("RIGHT", r2, "RIGHT", -2, 0)
+  r2._x:Hide()
+  r2._x:SetScript("OnClick", function()
+    if r2._key and FBA and FBA.db and FBA.db.spells[r2._key] then
+      FBA.db.spells[r2._key] = nil
+      if FBA.UI_selectedKey == r2._key then FBA.UI_selectedKey = nil end
+      FBA:UI_Refresh()
+      DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Removed '"..(r2._name or r2._key or "?").."'")
+    end
+  end)
+  r2:Hide(); trackedRowsR[i] = r2
 end
 
 -- Paging state
@@ -501,7 +587,7 @@ trackedNext:SetScript("OnClick", function()
 end)
 
 
--- UI helper (1.12-safe): returns the spellbook subtext (Rank/Passive/etc.) for a given name
+-- UI helper (1.12-safe): returns subtext (Rank/Passive/etc.) for a given spell name
 function FBA_UI_GetSubtextByName(name)
   if not name or name == "" then return "" end
   if not (GetNumSpellTabs and GetSpellTabInfo and GetSpellName) then return "" end
@@ -575,28 +661,46 @@ function FBA:UI_Refresh()
   end
   table.sort(tracked, function(a,b) return string.lower(a.name) < string.lower(b.name) end)
 
-  updatePageText(table.getn(tracked), trackedPageText, "UI_trackPage")
-  local tstart = ((FBA.UI_trackPage or 1)-1)*visibleRows + 1
+  updatePageText(table.getn(tracked), trackedPageText, "UI_trackPage", visibleRows*2)
+  local tstart = ((FBA.UI_trackPage or 1)-1)*(visibleRows*2) + 1
+
+  
+  -- Hide all Remove buttons by default for safety (will re-show for populated rows)
+  for i=1,visibleRows do
+    local tw = trackedRows and trackedRows[i]
+    if tw and tw._remove then tw._remove:Hide() end
+  end
 
   for row=1,visibleRows do
-    local idx = tstart + (row-1)
-    local entry = tracked[idx]
-    local w = trackedRows[row]
-    if entry then
-      w._key = entry.key
-      w._name = entry.name
-      w._icon:SetTexture(FBA:GetSpellTextureByName(entry.name))
-      local label = entry.name .. (entry.enabled and " |cff55ff55[ON]|r" or " |cffff5555[OFF]|r")
-      w._label:SetText(label)
-      w:Show()
-    else
-      w._key = nil
-      w._name = nil
-      w._label:SetText("")
-      w._icon:SetTexture(nil)
-      w:Hide()
-    end
+  local idxL = tstart + (row-1)*2
+  local idxR = idxL + 1
+  local entryL = tracked[idxL]
+  local entryR = tracked[idxR]
+  local wL = trackedRows[row]
+  local wR = trackedRowsR[row]
+  if entryL then
+    wL._key = entryL.key; wL._name = entryL.name
+    wL._icon:SetTexture(FBA:GetSpellTextureByName(entryL.name))
+    local nameL = entryL.name; nameL = string.gsub(nameL, " %b()", "")
+    wL._label:SetText(nameL)
+    if wL._sub then wL._sub:SetText(FBA_UI_GetSubtextByName(entryL.name) or "") end
+    if wL._x then wL._x:Show() end
+    wL:Show()
+  else
+    wL._key=nil; wL._name=nil; if wL._sub then wL._sub:SetText("") end; wL._label:SetText(""); wL._icon:SetTexture(nil); if wL._x then wL._x:Hide() end; wL:Hide()
   end
+  if entryR then
+    wR._key = entryR.key; wR._name = entryR.name
+    wR._icon:SetTexture(FBA:GetSpellTextureByName(entryR.name))
+    local nameR = entryR.name; nameR = string.gsub(nameR, " %b()", "")
+    wR._label:SetText(nameR)
+    if wR._sub then wR._sub:SetText(FBA_UI_GetSubtextByName(entryR.name) or "") end
+    if wR._x then wR._x:Show() end
+    wR:Show()
+  else
+    wR._key=nil; wR._name=nil; if wR._sub then wR._sub:SetText("") end; wR._label:SetText(""); wR._icon:SetTexture(nil); if wR._x then wR._x:Hide() end; wR:Hide()
+  end
+end
 
   FBA:UI_RefreshDetail()
 end
