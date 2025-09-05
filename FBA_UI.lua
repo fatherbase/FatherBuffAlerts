@@ -517,14 +517,17 @@ for i=1,visibleRows do
   r._x:SetPoint("RIGHT", r, "RIGHT", -2, 0)
   r._x:Hide()
   r._x:SetScript("OnClick", function()
-    if r._key and FBA and FBA.db and FBA.db.spells[r._key] then
-      FBA.db.spells[r._key] = nil
-      if FBA.UI_selectedKey == r._key then FBA.UI_selectedKey = nil end
-      FBA:UI_Refresh()
-      DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Removed '"..(r._name or r._key or "?").."'")
-    end
-  end)
-  r:Hide(); trackedRows[i] = r
+  local row = this and this.GetParent and this:GetParent() or nil
+  local key = row and row._key
+  if key and FBA and FBA.db and FBA.db.spells[key] then
+    local nm = (row._name or (FBA.db.spells[key] and FBA.db.spells[key].name) or key)
+    FBA.db.spells[key] = nil
+    if FBA.UI_selectedKey == key then FBA.UI_selectedKey = nil end
+    FBA:UI_Refresh()
+    DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Removed '".. nm .."'")
+  end
+end)
+r:Hide(); trackedRows[i] = r
   -- Tracked Right cell
   local r2 = CreateFrame("Frame", nil, trackedBG)
   r2:SetHeight(26); r2:SetWidth(math.floor((panelW-36)/2))
@@ -551,14 +554,17 @@ for i=1,visibleRows do
   r2._x:SetPoint("RIGHT", r2, "RIGHT", -2, 0)
   r2._x:Hide()
   r2._x:SetScript("OnClick", function()
-    if r2._key and FBA and FBA.db and FBA.db.spells[r2._key] then
-      FBA.db.spells[r2._key] = nil
-      if FBA.UI_selectedKey == r2._key then FBA.UI_selectedKey = nil end
-      FBA:UI_Refresh()
-      DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Removed '"..(r2._name or r2._key or "?").."'")
-    end
-  end)
-  r2:Hide(); trackedRowsR[i] = r2
+  local row = this and this.GetParent and this:GetParent() or nil
+  local key = row and row._key
+  if key and FBA and FBA.db and FBA.db.spells[key] then
+    local nm = (row._name or (FBA.db.spells[key] and FBA.db.spells[key].name) or key)
+    FBA.db.spells[key] = nil
+    if FBA.UI_selectedKey == key then FBA.UI_selectedKey = nil end
+    FBA:UI_Refresh()
+    DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Removed '".. nm .."'")
+  end
+end)
+r2:Hide(); trackedRowsR[i] = r2
 end
 
 -- Paging state
