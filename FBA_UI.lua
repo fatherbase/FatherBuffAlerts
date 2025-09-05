@@ -75,6 +75,7 @@ end
 local FRAME_W, FRAME_H = 800, 540
 local MARGIN = 16
 local GAP = 12
+local RowDelta = 26
 
 local frame = CreateFrame("Frame", "FBA_Config", UIParent)
 frame:SetWidth(FRAME_W); frame:SetHeight(FRAME_H)
@@ -126,18 +127,27 @@ cbMinimap:SetScript("OnClick", function()
   end
 end)
 
--- Master Enable (second row, left)
+-- Row 2: Master Enable (second row, left)
 local cbEnabled = CreateFrame("CheckButton", "FBA_CBEnabled", frame, "UICheckButtonTemplate")
-cbEnabled:SetPoint("TOPLEFT", frame, "TOPLEFT", MARGIN, -64)
+cbEnabled:SetPoint("TOPLEFT", frame, "TOPLEFT", MARGIN, rowY - RowDelta)
 FBA_CBEnabledText:SetText("Addon enabled")
 cbEnabled:SetScript("OnClick", function() if FBA and FBA.db then FBA.db.enabled = FBA_CBEnabled:GetChecked() end end)
 
 -- ===== Buff Settings strip (left) and Quick Add (right) aligned on same level
+local buffSettingsRow = rowY - 2 * RowDelta - 10
+
+local buffSettingsFrameRow = -46
+local buffSettingsFrameRowDelta = 26
+
+local buffSettingsFrameColumn = 12
+
+local firstPanelRowHeight = 135
+
 -- keep widths within inner space (FRAME_W - 2*MARGIN)
 --  BuffSettings 540 + GAP(12) + QuickAdd 220 = 772 <= 820-32 = 788 (fits)
 local detBG = CreateFrame("Frame", nil, frame)
-detBG:SetWidth(540); detBG:SetHeight(150)
-detBG:SetPoint("TOPLEFT", frame, "TOPLEFT", MARGIN, -96)
+detBG:SetWidth(410); detBG:SetHeight(firstPanelRowHeight)
+detBG:SetPoint("TOPLEFT", frame, "TOPLEFT", MARGIN, buffSettingsRow)
 detBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
                     tile = true, tileSize = 16, edgeSize = 12,
@@ -145,20 +155,22 @@ detBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
 detBG:SetBackdropColor(0,0,0,0.5)
 
 local detTitle = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-detTitle:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -8)
+detTitle:SetPoint("TOPLEFT", detBG, "TOPLEFT", buffSettingsFrameColumn, -8)
 detTitle:SetText("Buff Settings")
 
 local lblName = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lblName:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -30)
+lblName:SetPoint("TOPLEFT", detBG, "TOPLEFT", buffSettingsFrameColumn, -30)
 lblName:SetText("Name: ")
 
 local txtName = detBG:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 txtName:SetPoint("LEFT", lblName, "RIGHT", 4, 0)
 txtName:SetText("—")
 
+
+
 -- Row 1 of toggles (more vertical spacing so Sound isn't too close)
 local cbSpellEnabled = CreateFrame("CheckButton", "FBA_CBSpellEnabled", detBG, "UICheckButtonTemplate")
-cbSpellEnabled:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -56)
+cbSpellEnabled:SetPoint("TOPLEFT", detBG, "TOPLEFT", buffSettingsFrameColumn -4, buffSettingsFrameRow)
 FBA_CBSpellEnabledText:SetText("Enable this buff")
 cbSpellEnabled:SetScript("OnClick", function()
   local key = FBA.UI_selectedKey
@@ -190,7 +202,7 @@ end)
 
 -- Row 2 of toggles
 local cbLong = CreateFrame("CheckButton", "FBA_CBLong", detBG, "UICheckButtonTemplate")
-cbLong:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -80)
+cbLong:SetPoint("TOPLEFT", detBG, "TOPLEFT", buffSettingsFrameColumn -4, buffSettingsFrameRow - buffSettingsFrameRowDelta)
 FBA_CBLongText:SetText("5m reminder for ≥9m buffs")
 cbLong:SetScript("OnClick", function()
   local key = FBA.UI_selectedKey
@@ -221,7 +233,7 @@ ebDelay:SetScript("OnEnterPressed", function() this:ClearFocus() end)
 
 -- Row 3: Sound (extra vertical gap so it's not tight under row 2)
 local lblSound = detBG:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lblSound:SetPoint("TOPLEFT", detBG, "TOPLEFT", 8, -108)
+lblSound:SetPoint("TOPLEFT", detBG, "TOPLEFT", buffSettingsFrameColumn, buffSettingsFrameRow - 2 * buffSettingsFrameRowDelta -10)
 lblSound:SetText("Sound:")
 
 local ddSound = CreateFrame("Button", "FBA_DDSound", detBG, "UIPanelButtonTemplate")
@@ -264,8 +276,18 @@ ebSound:SetScript("OnTextChanged", function()
 end)
 
 -- Quick Add panel (right of Buff Settings, same vertical level)
+
+local quickAddPanelWidth = 220
+
+local QuickAddFrameRow = -26
+local QuickAddFrameRowDelta = 6
+
+local QuickAddFrameColumn = 12
+
+
+
 local ctrlBG = CreateFrame("Frame", nil, frame)
-ctrlBG:SetWidth(220); ctrlBG:SetHeight(150)
+ctrlBG:SetWidth(quickAddPanelWidth); ctrlBG:SetHeight(firstPanelRowHeight)
 ctrlBG:SetPoint("TOPLEFT", detBG, "TOPRIGHT", GAP, 0)  -- anchored to right of detBG
 ctrlBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                      edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -274,17 +296,17 @@ ctrlBG:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
 ctrlBG:SetBackdropColor(0,0,0,0.5)
 
 local ctrlTitle = ctrlBG:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-ctrlTitle:SetPoint("TOPLEFT", ctrlBG, "TOPLEFT", 8, -8)
+ctrlTitle:SetPoint("TOPLEFT", ctrlBG, "TOPLEFT", QuickAddFrameColumn, -8)
 ctrlTitle:SetText("Quick Add")
 
 local addBox = CreateFrame("EditBox", "FBA_AddBox", ctrlBG, "InputBoxTemplate")
-addBox:SetWidth(192); addBox:SetHeight(20)
-addBox:SetPoint("TOPLEFT", ctrlBG, "TOPLEFT", 12, -32)
+addBox:SetWidth(quickAddPanelWidth - 2 * QuickAddFrameColumn); addBox:SetHeight(20)
+addBox:SetPoint("TOPLEFT", ctrlBG, "TOPLEFT", QuickAddFrameColumn + 4, QuickAddFrameRow)
 addBox:SetAutoFocus(false)
 
 local addBtn = CreateFrame("Button", nil, ctrlBG, "UIPanelButtonTemplate")
-addBtn:SetWidth(100); addBtn:SetHeight(22)
-addBtn:SetPoint("TOPLEFT", addBox, "BOTTOMLEFT", 0, -8)
+addBtn:SetWidth((quickAddPanelWidth - 2 * QuickAddFrameColumn)/2); addBtn:SetHeight(22)
+addBtn:SetPoint("TOPLEFT", addBox, "TOPLEFT", -6 , QuickAddFrameRow)
 addBtn:SetText("Add by name")
 addBtn:SetScript("OnClick", function()
   local nm = FBA_AddBox:GetText()
@@ -303,7 +325,7 @@ addBtn:SetScript("OnClick", function()
 end)
 
 local addNextBtn = CreateFrame("Button", nil, ctrlBG, "UIPanelButtonTemplate")
-addNextBtn:SetWidth(100); addNextBtn:SetHeight(22)
+addNextBtn:SetWidth((quickAddPanelWidth - 2 * QuickAddFrameColumn)/2); addNextBtn:SetHeight(22)
 addNextBtn:SetPoint("LEFT", addBtn, "RIGHT", 6, 0) -- fully inside the panel
 addNextBtn:SetText("Add Next Cast")
 addNextBtn:SetScript("OnClick", function()
