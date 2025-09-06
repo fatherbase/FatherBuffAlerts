@@ -7,6 +7,11 @@ Per-character **multi-buff** expiry alerts with a **sound** and an optional **ce
 
 ## Changelog
 
+### 2.4.0
+
+- Updated UI to look similar to normal spellbook.
+- Fixed Layout
+
 ### 2.3.0
 
 - Maintenance release: version bump and rebuild for distribution.

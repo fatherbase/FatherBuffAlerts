@@ -1,6 +1,6 @@
 -- FatherBuffAlerts (WoW 1.12 / Lua 5.0)
 -- Core logic: DB, multi-buff scanning, sounds, countdown hooks, slash commands.
--- Version: 2.3.0 (alert fade + duplicate sound fix)
+-- Version: 2.4.0 (alert fade + duplicate sound fix)
 
 FBA = FBA or {}
 

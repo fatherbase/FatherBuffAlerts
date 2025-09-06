@@ -1,5 +1,5 @@
 -- FatherBuffAlerts - Settings UI + Minimap button (WoW 1.12 / Lua 5.0)
--- Version: 2.3.0 (Fix: Remove buttons parented to row; auto-hide when row hidden)
+-- Version: 2.4.0 (Fix: Remove buttons parented to row; auto-hide when row hidden)
 
 -- =======================
 -- Minimap Button (standard ring style)
