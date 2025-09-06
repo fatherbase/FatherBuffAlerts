@@ -75,6 +75,15 @@ function FBA:UI_Debug(msg)
   end
 end
 
+-- helper: route UI actions through the /fba slash handler where possible
+local function FBA_UI_DoSlash(cmd)
+  if SlashCmdList and SlashCmdList["FBA"] then
+    SlashCmdList["FBA"](cmd or "")
+  end
+end
+
+
+
 
 
 -- =======================

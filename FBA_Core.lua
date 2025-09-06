@@ -5,7 +5,7 @@
 FBA = FBA or {}
 
 -- ---- Core state / constants
-FBA.version    = "2.4.2"
+FBA.version    = "2.4.3"
 FBA.timer      = FBA.timer or 0          -- ~10 Hz scan throttle
 FBA.EPSILON    = FBA.EPSILON or 0.15     -- small cushion for frame timing
 FBA.rt         = FBA.rt or {}            -- runtime flags per tracked buff key
