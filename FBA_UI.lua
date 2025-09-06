@@ -69,6 +69,15 @@ function FBA:UI_PositionMinimapButton()
   if FBA.db.minimap.show then FBA_MinimapButton:Show() else FBA_MinimapButton:Hide() end
 end
 
+-- Lightweight debug printer (respects per-character DB setting)
+function FBA:UI_Debug(msg)
+  if FBA and FBA.db and FBA.db.debug then
+    DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FBA Debug:|r "..(msg or ""))
+  end
+end
+
+
+
 -- =======================
 -- Settings Window (tighter layout, proper margins, aligned controls)
 -- =======================
@@ -105,7 +114,7 @@ local rowY = -40
 local cbSplash = CreateFrame("CheckButton", "FBA_CBSplash", frame, "UICheckButtonTemplate")
 cbSplash:SetPoint("TOPLEFT", frame, "TOPLEFT", MARGIN, rowY)
 FBA_CBSplashText:SetText("On-screen splash (global)")
-cbSplash:SetScript("OnClick", function() if FBA and FBA.db then FBA.db.showAlert = FBA_CBSplash:GetChecked() end end)
+cbSplash:SetScript("OnClick", function() if FBA and FBA.db then FBA.db.showAlert = FBA_CBSplash:GetChecked(); FBA:UI_Debug("Global splash: "..(FBA.db.showAlert and "ON" or "OFF")) end end)
 
 local cbCountdown = CreateFrame("CheckButton", "FBA_CBCountdown", frame, "UICheckButtonTemplate")
 cbCountdown:SetPoint("LEFT", FBA_CBSplash, "RIGHT", 140, 0)
@@ -114,16 +123,65 @@ cbCountdown:SetScript("OnClick", function()
   if FBA and FBA.db then
     FBA.db.alertCountdown = FBA_CBCountdown:GetChecked()
     if not FBA_CBCountdown:GetChecked() then FBA:HideAlert() end
+    FBA:UI_Debug("Global countdown: "..(FBA.db.alertCountdown and "ON" or "OFF"))
   end
 end)
 
 local cbMinimap = CreateFrame("CheckButton", "FBA_CBMinimap", frame, "UICheckButtonTemplate")
 cbMinimap:SetPoint("LEFT", FBA_CBCountdown, "RIGHT", 140, 0)
 FBA_CBMinimapText:SetText("Show minimap button")
+
+-- Move Alert button (toggles /fba unlock/lock)
+local moveBtn = CreateFrame("Button", "FBA_BtnMoveAlert", frame, "UIPanelButtonTemplate")
+moveBtn:SetWidth(110); moveBtn:SetHeight(22)
+moveBtn:SetPoint("LEFT", FBA_CBMinimap, "RIGHT", 140, 0)
+moveBtn:SetText("Move Alert")
+
+local function FBA_CallSlash(cmd)
+  if SlashCmdList and SlashCmdList["FBA"] then
+    SlashCmdList["FBA"](cmd)
+  else
+    if cmd == "unlock" then if FBA.ShowAnchor then FBA:ShowAnchor(true) end
+    else if FBA.ShowAnchor then FBA:ShowAnchor(false) end end
+  end
+end
+
+local function FBA_UpdateMoveBtnText()
+  if FBA_Anchor and FBA_Anchor:IsShown() then moveBtn:SetText("Lock Alert") else moveBtn:SetText("Move Alert") end
+end
+
+moveBtn:SetScript("OnClick", function()
+  if FBA_Anchor and FBA_Anchor:IsShown() then
+    FBA_CallSlash("lock")
+    FBA:UI_Debug("Alert position locked.")
+  else
+    FBA_CallSlash("unlock")
+    FBA:UI_Debug("Alert anchor shown; drag to reposition.")
+  end
+  FBA_UpdateMoveBtnText()
+end)
+moveBtn:SetScript("OnShow", FBA_UpdateMoveBtnText)
+
+-- Debug messages checkbox
+local cbDebug = CreateFrame("CheckButton", "FBA_CBDebug", frame, "UICheckButtonTemplate")
+cbDebug:SetPoint("LEFT", moveBtn, "RIGHT", 16, 0)
+FBA_CBDebugText:SetText("Debug messages")
+cbDebug:SetScript("OnShow", function()
+  if FBA and FBA.db then FBA_CBDebug:SetChecked( not not FBA.db.debug ) end
+end)
+cbDebug:SetScript("OnClick", function()
+  if FBA and FBA.db then
+    FBA.db.debug = FBA_CBDebug:GetChecked() and true or false
+    FBA:UI_Debug("Debug messages "..(FBA.db.debug and "ON" or "OFF"))
+  end
+end)
+
+
 cbMinimap:SetScript("OnClick", function()
   if FBA and FBA.db then
     FBA.db.minimap.show = FBA_CBMinimap:GetChecked()
     FBA:UI_PositionMinimapButton()
+    FBA:UI_Debug("Minimap button: "..(FBA.db.minimap.show and "SHOW" or "HIDE"))
   end
 end)
 
@@ -131,7 +189,7 @@ end)
 local cbEnabled = CreateFrame("CheckButton", "FBA_CBEnabled", frame, "UICheckButtonTemplate")
 cbEnabled:SetPoint("TOPLEFT", frame, "TOPLEFT", MARGIN, rowY - RowDelta)
 FBA_CBEnabledText:SetText("Addon enabled")
-cbEnabled:SetScript("OnClick", function() if FBA and FBA.db then FBA.db.enabled = FBA_CBEnabled:GetChecked() end end)
+cbEnabled:SetScript("OnClick", function() if FBA and FBA.db then FBA.db.enabled = FBA_CBEnabled:GetChecked(); FBA:UI_Debug("Addon enabled: "..(FBA.db.enabled and "ON" or "OFF")) end end)
 
 -- ===== Buff Settings strip (left) and Quick Add (right) aligned on same level
 local buffSettingsRow = rowY - 2 * RowDelta - 10
@@ -177,6 +235,7 @@ cbSpellEnabled:SetScript("OnClick", function()
   if key and FBA.db and FBA.db.spells[key] then
     FBA.db.spells[key].enabled = FBA_CBSpellEnabled:GetChecked()
     FBA:UI_Refresh()
+    FBA:UI_Debug("Buff '"..FBA.db.spells[key].name.."' enabled: "..(FBA.db.spells[key].enabled and "ON" or "OFF"))
   end
 end)
 
@@ -187,6 +246,7 @@ cbBuffSplash:SetScript("OnClick", function()
   local key = FBA.UI_selectedKey
   if key and FBA.db and FBA.db.spells[key] then
     FBA.db.spells[key].showSplash = FBA_CBBuffSplash:GetChecked()
+    FBA:UI_Debug("Buff '"..FBA.db.spells[key].name.."' splash: "..(FBA.db.spells[key].showSplash and "ON" or "OFF"))
   end
 end)
 
@@ -197,6 +257,7 @@ cbCombat:SetScript("OnClick", function()
   local key = FBA.UI_selectedKey
   if key and FBA.db and FBA.db.spells[key] then
     FBA.db.spells[key].combatOnly = FBA_CBCombat:GetChecked()
+    FBA:UI_Debug("Buff '"..FBA.db.spells[key].name.."' combat-only: "..(FBA.db.spells[key].combatOnly and "ON" or "OFF"))
   end
 end)
 
@@ -208,6 +269,7 @@ cbLong:SetScript("OnClick", function()
   local key = FBA.UI_selectedKey
   if key and FBA.db and FBA.db.spells[key] then
     FBA.db.spells[key].useLongReminder = FBA_CBLong:GetChecked()
+    FBA:UI_Debug("Buff '"..FBA.db.spells[key].name.."' 5m reminder: "..(FBA.db.spells[key].useLongReminder and "ON" or "OFF"))
   end
 end)
 
@@ -218,6 +280,7 @@ cbCD:SetScript("OnClick", function()
   local key = FBA.UI_selectedKey
   if key and FBA.db and FBA.db.spells[key] then
     FBA.db.spells[key].showCountdown = FBA_CBCDown:GetChecked()
+    FBA:UI_Debug("Buff '"..FBA.db.spells[key].name.."' countdown: "..(FBA.db.spells[key].showCountdown and "ON" or "OFF"))
   end
 end)
 
@@ -272,6 +335,7 @@ ebSound:SetScript("OnTextChanged", function()
   if key and FBA.db and FBA.db.spells[key] and FBA_DDSound._mode == "custom" then
     local v = FBA_EBSoundPath:GetText()
     FBA.db.spells[key].sound = (v and v ~= "" and v) or "default"
+    FBA:UI_Debug("Buff '"..FBA.db.spells[key].name.."' sound path set.")
   end
 end)
 
