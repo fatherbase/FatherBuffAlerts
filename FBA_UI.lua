@@ -111,7 +111,7 @@ tinsert(UISpecialFrames, "FBA_Config")
 
 local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
 title:SetPoint("TOP", frame, "TOP", 0, -14)
-title:SetText("FatherBuffAlerts — Settings")
+title:SetText("FatherBuffAlerts — Settings v"..(FBA and FBA.version or "?"))
 
 local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -5, -5)
