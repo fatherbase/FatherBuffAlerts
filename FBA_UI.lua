@@ -122,17 +122,23 @@ local rowY = -40
 local cbSplash = CreateFrame("CheckButton", "FBA_CBSplash", frame, "UICheckButtonTemplate")
 cbSplash:SetPoint("TOPLEFT", frame, "TOPLEFT", MARGIN, rowY)
 FBA_CBSplashText:SetText("On-screen splash (global)")
-cbSplash:SetScript("OnClick", function() if FBA and FBA.db then FBA.db.showAlert = FBA_CBSplash:GetChecked(); FBA:UI_Debug("Global splash: "..(FBA.db.showAlert and "ON" or "OFF")) end end)
+cbSplash:SetScript("OnClick", function()
+  if not (FBA and FBA.db) then return end
+  local desired = cbSplash:GetChecked() and true or false
+  local current = FBA.db.showAlert
+  if desired ~= (current and true or false) then FBA_UI_DoSlash("alert") end
+  if FBA and FBA.UI_Debug then FBA:UI_Debug("Global splash: " .. (desired and "ON" or "OFF")) end
+end)
 
 local cbCountdown = CreateFrame("CheckButton", "FBA_CBCountdown", frame, "UICheckButtonTemplate")
 cbCountdown:SetPoint("LEFT", FBA_CBSplash, "RIGHT", 140, 0)
 FBA_CBCountdownText:SetText("Live countdown (global)")
 cbCountdown:SetScript("OnClick", function()
-  if FBA and FBA.db then
-    FBA.db.alertCountdown = FBA_CBCountdown:GetChecked()
-    if not FBA_CBCountdown:GetChecked() then FBA:HideAlert() end
-    FBA:UI_Debug("Global countdown: "..(FBA.db.alertCountdown and "ON" or "OFF"))
-  end
+  if not (FBA and FBA.db) then return end
+  local desired = cbCountdown:GetChecked() and true or false
+  local current = FBA.db.alertCountdown
+  if desired ~= (current and true or false) then FBA_UI_DoSlash("countdown") end
+  if FBA and FBA.UI_Debug then FBA:UI_Debug("Global countdown: " .. (desired and "ON" or "OFF")) end
 end)
 
 local cbMinimap = CreateFrame("CheckButton", "FBA_CBMinimap", frame, "UICheckButtonTemplate")
@@ -197,7 +203,13 @@ end)
 local cbEnabled = CreateFrame("CheckButton", "FBA_CBEnabled", frame, "UICheckButtonTemplate")
 cbEnabled:SetPoint("TOPLEFT", frame, "TOPLEFT", MARGIN, rowY - RowDelta)
 FBA_CBEnabledText:SetText("Addon enabled")
-cbEnabled:SetScript("OnClick", function() if FBA and FBA.db then FBA.db.enabled = FBA_CBEnabled:GetChecked(); FBA:UI_Debug("Addon enabled: "..(FBA.db.enabled and "ON" or "OFF")) end end)
+cbEnabled:SetScript("OnClick", function()
+  if not (FBA and FBA.db) then return end
+  local desired = cbEnabled:GetChecked() and true or false
+  local current = FBA.db.enabled
+  if desired ~= (current and true or false) then FBA_UI_DoSlash("enable") end
+  if FBA and FBA.UI_Debug then FBA:UI_Debug("Addon enabled: " .. (desired and "ON" or "OFF")) end
+end)
 
 -- ===== Buff Settings strip (left) and Quick Add (right) aligned on same level
 local buffSettingsRow = rowY - 2 * RowDelta - 10
@@ -239,11 +251,14 @@ local cbSpellEnabled = CreateFrame("CheckButton", "FBA_CBSpellEnabled", detBG, "
 cbSpellEnabled:SetPoint("TOPLEFT", detBG, "TOPLEFT", buffSettingsFrameColumn -4, buffSettingsFrameRow)
 FBA_CBSpellEnabledText:SetText("Enable this buff")
 cbSpellEnabled:SetScript("OnClick", function()
-  local key = FBA.UI_selectedKey
+  local key = FBA and FBA.UI_selectedKey
   if key and FBA.db and FBA.db.spells[key] then
-    FBA.db.spells[key].enabled = FBA_CBSpellEnabled:GetChecked()
-    FBA:UI_Refresh()
-    FBA:UI_Debug("Buff '"..FBA.db.spells[key].name.."' enabled: "..(FBA.db.spells[key].enabled and "ON" or "OFF"))
+    local sp = FBA.db.spells[key]
+    local desired = FBA_CBSpellEnabled:GetChecked() and true or false
+    if desired ~= (sp.enabled and true or false) then
+      FBA_UI_DoSlash("set " .. (sp.name or "") .. " enable")
+    end
+    if FBA and FBA.UI_Debug then FBA:UI_Debug("Buff '"..(sp.name or "").."' enabled: " .. (desired and "ON" or "OFF")) end
   end
 end)
 
@@ -251,10 +266,14 @@ local cbBuffSplash = CreateFrame("CheckButton", "FBA_CBBuffSplash", detBG, "UICh
 cbBuffSplash:SetPoint("LEFT", FBA_CBSpellEnabled, "RIGHT", 110, 0)
 FBA_CBBuffSplashText:SetText("On-screen splash")
 cbBuffSplash:SetScript("OnClick", function()
-  local key = FBA.UI_selectedKey
+  local key = FBA and FBA.UI_selectedKey
   if key and FBA.db and FBA.db.spells[key] then
-    FBA.db.spells[key].showSplash = FBA_CBBuffSplash:GetChecked()
-    FBA:UI_Debug("Buff '"..FBA.db.spells[key].name.."' splash: "..(FBA.db.spells[key].showSplash and "ON" or "OFF"))
+    local sp = FBA.db.spells[key]
+    local desired = FBA_CBBuffSplash:GetChecked() and true or false
+    if desired ~= ((sp.showSplash ~= false) and true or false) then
+      FBA_UI_DoSlash("set " .. (sp.name or "") .. " splash")
+    end
+    if FBA and FBA.UI_Debug then FBA:UI_Debug("Buff '"..(sp.name or "").."' splash: " .. (desired and "ON" or "OFF")) end
   end
 end)
 
@@ -262,10 +281,14 @@ local cbCombat = CreateFrame("CheckButton", "FBA_CBCombat", detBG, "UICheckButto
 cbCombat:SetPoint("LEFT", FBA_CBBuffSplash, "RIGHT", 110, 0)
 FBA_CBCombatText:SetText("Only in combat")
 cbCombat:SetScript("OnClick", function()
-  local key = FBA.UI_selectedKey
+  local key = FBA and FBA.UI_selectedKey
   if key and FBA.db and FBA.db.spells[key] then
-    FBA.db.spells[key].combatOnly = FBA_CBCombat:GetChecked()
-    FBA:UI_Debug("Buff '"..FBA.db.spells[key].name.."' combat-only: "..(FBA.db.spells[key].combatOnly and "ON" or "OFF"))
+    local sp = FBA.db.spells[key]
+    local desired = FBA_CBCombat:GetChecked() and true or false
+    if desired ~= (sp.combatOnly and true or false) then
+      FBA_UI_DoSlash("set " .. (sp.name or "") .. " combat")
+    end
+    if FBA and FBA.UI_Debug then FBA:UI_Debug("Buff '"..(sp.name or "").."' combat-only: " .. (desired and "ON" or "OFF")) end
   end
 end)
 
@@ -274,10 +297,14 @@ local cbLong = CreateFrame("CheckButton", "FBA_CBLong", detBG, "UICheckButtonTem
 cbLong:SetPoint("TOPLEFT", detBG, "TOPLEFT", buffSettingsFrameColumn -4, buffSettingsFrameRow - buffSettingsFrameRowDelta)
 FBA_CBLongText:SetText("5m reminder for ≥9m buffs")
 cbLong:SetScript("OnClick", function()
-  local key = FBA.UI_selectedKey
+  local key = FBA and FBA.UI_selectedKey
   if key and FBA.db and FBA.db.spells[key] then
-    FBA.db.spells[key].useLongReminder = FBA_CBLong:GetChecked()
-    FBA:UI_Debug("Buff '"..FBA.db.spells[key].name.."' 5m reminder: "..(FBA.db.spells[key].useLongReminder and "ON" or "OFF"))
+    local sp = FBA.db.spells[key]
+    local desired = FBA_CBLong:GetChecked() and true or false
+    if desired ~= (sp.useLongReminder and true or false) then
+      FBA_UI_DoSlash("set " .. (sp.name or "") .. " long")
+    end
+    if FBA and FBA.UI_Debug then FBA:UI_Debug("Buff '"..(sp.name or "").."' 5m reminder: " .. (desired and "ON" or "OFF")) end
   end
 end)
 
@@ -285,10 +312,14 @@ local cbCD = CreateFrame("CheckButton", "FBA_CBCDown", detBG, "UICheckButtonTemp
 cbCD:SetPoint("LEFT", FBA_CBLong, "RIGHT", 110, 0)
 FBA_CBCDownText:SetText("Live countdown (≤10s)")
 cbCD:SetScript("OnClick", function()
-  local key = FBA.UI_selectedKey
+  local key = FBA and FBA.UI_selectedKey
   if key and FBA.db and FBA.db.spells[key] then
-    FBA.db.spells[key].showCountdown = FBA_CBCDown:GetChecked()
-    FBA:UI_Debug("Buff '"..FBA.db.spells[key].name.."' countdown: "..(FBA.db.spells[key].showCountdown and "ON" or "OFF"))
+    local sp = FBA.db.spells[key]
+    local desired = FBA_CBCDown:GetChecked() and true or false
+    if desired ~= ((sp.showCountdown ~= false) and true or false) then
+      FBA_UI_DoSlash("set " .. (sp.name or "") .. " countdown")
+    end
+    if FBA and FBA.UI_Debug then FBA:UI_Debug("Buff '"..(sp.name or "").."' countdown: " .. (desired and "ON" or "OFF")) end
   end
 end)
 
@@ -327,23 +358,27 @@ ddSound:SetScript("OnClick", function()
   FBA_DDSound._mode = m
   FBA_DDSound:SetText(m)
   if m == "custom" then FBA_EBSoundPath:Show() else FBA_EBSoundPath:Hide() end
-  local key = FBA.UI_selectedKey
+  local key = FBA and FBA.UI_selectedKey
   if key and FBA.db and FBA.db.spells[key] then
+    local nm = FBA.db.spells[key].name or ""
     if m == "custom" then
-      local p = FBA_EBSoundPath:GetText()
-      FBA.db.spells[key].sound = (p and p ~= "" and p) or "default"
+      local p = FBA_EBSoundPath:GetText() or ""
+      if p ~= "" then FBA_UI_DoSlash("set " .. nm .. " sound " .. p) end
+      if FBA and FBA.UI_Debug then FBA:UI_Debug("Buff '"..nm.."' sound: custom") end
     else
-      FBA.db.spells[key].sound = m
+      FBA_UI_DoSlash("set " .. nm .. " sound " .. m)
+      if FBA and FBA.UI_Debug then FBA:UI_Debug("Buff '"..nm.."' sound: " .. m) end
     end
   end
 end)
 
 ebSound:SetScript("OnTextChanged", function()
-  local key = FBA.UI_selectedKey
+  local key = FBA and FBA.UI_selectedKey
   if key and FBA.db and FBA.db.spells[key] and FBA_DDSound._mode == "custom" then
-    local v = FBA_EBSoundPath:GetText()
-    FBA.db.spells[key].sound = (v and v ~= "" and v) or "default"
-    FBA:UI_Debug("Buff '"..FBA.db.spells[key].name.."' sound path set.")
+    local nm = FBA.db.spells[key].name or ""
+    local v = FBA_EBSoundPath:GetText() or ""
+    if v ~= "" then FBA_UI_DoSlash("set " .. nm .. " sound " .. v) end
+    if FBA and FBA.UI_Debug then FBA:UI_Debug("Buff '"..nm.."' sound path set.") end
   end
 end)
 
@@ -382,18 +417,7 @@ addBtn:SetPoint("TOPLEFT", addBox, "TOPLEFT", -6 , QuickAddFrameRow)
 addBtn:SetText("Add by name")
 addBtn:SetScript("OnClick", function()
   local nm = FBA_AddBox:GetText()
-  if nm and nm ~= "" and FBA and FBA.db then
-    local key = string.lower(nm)
-    if not FBA.db.spells[key] then
-      FBA.db.spells[key] = { name = nm, enabled = true, threshold = 4, sound = "default",
-                             combatOnly=false, useLongReminder=true, showCountdown=true, showSplash=true }
-      FBA_AddBox:SetText("")
-      FBA:UI_Refresh()
-      DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Added '"..nm.."'")
-    else
-      DEFAULT_CHAT_FRAME:AddMessage("|cffff9933FatherBuffAlerts:|r Already tracking '"..nm.."'")
-    end
-  end
+  if nm and nm ~= "" then FBA_UI_DoSlash("add " .. nm); if FBA and FBA.UI_Debug then FBA:UI_Debug("Add by name: "..nm) end end
 end)
 
 local addNextBtn = CreateFrame("Button", nil, ctrlBG, "UIPanelButtonTemplate")
