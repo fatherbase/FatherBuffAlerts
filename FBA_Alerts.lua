@@ -1,5 +1,4 @@
 -- FatherBuffAlerts - Alerts (splash UI)
--- Version: 2.4.0
 
 -- main alert frame
 local alertFrame = CreateFrame("Frame", "FBA_AlertFrame", UIParent)

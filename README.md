@@ -7,6 +7,11 @@ Per-character **multi-buff** expiry alerts with a **sound** and an optional **ce
 
 ## Changelog
 
+### 2.4.2
+
+- Fix: On-screen alert (splash/countdown) now **disappears immediately** if the corresponding buff is **refreshed** while the alert is visible.
+- Maintenance: version bump and cleanup of redundant version comments in source files.
+
 ### 2.4.0
 
 - Updated UI to look similar to normal spellbook.

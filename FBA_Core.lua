@@ -5,7 +5,7 @@
 FBA = FBA or {}
 
 -- ---- Core state / constants
-FBA.version    = "2.1.10"
+FBA.version    = "2.4.2"
 FBA.timer      = FBA.timer or 0          -- ~10 Hz scan throttle
 FBA.EPSILON    = FBA.EPSILON or 0.15     -- small cushion for frame timing
 FBA.rt         = FBA.rt or {}            -- runtime flags per tracked buff key
@@ -135,6 +135,23 @@ function FBA:OnUpdate(elapsed)
       self.rt[key] = rt
 
       if a and a.tl then
+
+-- If the buff time-left increases while an alert is showing, it was refreshed.
+-- Hide any visible alert and re-arm this buff's triggers.
+if rt.prevTL and (a.tl > rt.prevTL + self.EPSILON) then
+  -- re-arm markers for the new instance
+  rt.shortPlayed = false
+  rt.longPlayed = false
+  rt.seenMaxTL = a.tl
+  -- hide current alert if it belongs to (or could belong to) this buff
+  if self.alertActive then
+    if (self.activeKey == nil) or (self.activeKey == key) then
+      if self.HideAlert then self:HideAlert() end
+      self.activeKey = nil
+    end
+  end
+end
+
         -- track max to detect long buffs / reapplications
         if (not rt.seenMaxTL) or (a.tl > rt.seenMaxTL) then
           rt.seenMaxTL = a.tl
